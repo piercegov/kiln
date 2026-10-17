@@ -17,8 +17,8 @@ export const CollectCoins = system(
     if (p === undefined || coins.length === 0) return
     const pt = p.get(Transform)!
     let collected = 0
-    coins.forEach((coin) => {
-      if (distSq(coin.get(Transform)!, pt) < PICKUP_RADIUS * PICKUP_RADIUS) {
+    coins.each(([t], coin) => {
+      if (distSq(t, pt) < PICKUP_RADIUS * PICKUP_RADIUS) {
         commands.despawn(coin)
         res.mut(Score).value += 1
         events.emit(CoinCollected, { coin, by: p })
