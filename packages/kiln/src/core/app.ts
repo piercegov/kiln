@@ -304,12 +304,8 @@ export class App {
     const alive = () => !this.disposed && token === this.loopToken
     let last = performance.now()
     let nextAllowed = 0
-    // With vsync off, frames run back to back only until shortly before the next display refresh;
-    // then the loop waits for requestAnimationFrame. Running flat out starves the browser's own
-    // rendering step, so the canvas would only reach the screen a dozen times a second.
-    let rafInterval = 1000 / 60
-    let lastRaf = 0
-    let budgetEnd = 0
+    // With vsync off, frames run back to back via MessageChannel, one GPU frame in flight at a time
+    // (see the fence below). requestAnimationFrame still ticks to restart the pump after a switch.
     let pumping = false
     const channel = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null
 
@@ -343,13 +339,12 @@ export class App {
         return
       }
       const now = performance.now()
-      if (now >= budgetEnd) {
-        pumping = false // leave the rest of this refresh to the browser
-        return
-      }
       pumping = true
       if (!capOk(now)) {
-        setTimeout(pump, Math.max(0, Math.min(nextAllowed, budgetEnd) - now - 0.5))
+        // setTimeout overshoots by ~1 ms, so finish the last stretch with messages.
+        const wait = nextAllowed - now
+        if (wait > 2) setTimeout(pump, wait - 1.5)
+        else channel!.port2.postMessage(0)
         return
       }
       runFrame(now)
@@ -363,17 +358,12 @@ export class App {
     const onRaf = (t: number) => {
       if (!alive()) return
       requestAnimationFrame(onRaf)
-      if (lastRaf) {
-        const d = t - lastRaf
-        if (d > 1 && d < 100) rafInterval = rafInterval * 0.9 + d * 0.1
-      }
-      lastRaf = t
+      void t
       const now = performance.now()
       if (this.frameRate.vsync || !channel) {
         if (capOk(now)) runFrame(now)
         return
       }
-      budgetEnd = now + Math.max(1, rafInterval - 2)
       if (!pumping) pump()
     }
     requestAnimationFrame(onRaf)
