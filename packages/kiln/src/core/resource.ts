@@ -7,6 +7,8 @@ export const $resource = Symbol.for('kiln.resource')
 export interface Resource<T = unknown> {
   readonly [$resource]: true
   readonly create: (app: App) => T
+  /** Skip the dev read-only proxy (for Three.js objects and other class graphs). */
+  readonly opaque: boolean
   /** Name used in errors, snapshots and `kiln describe`. */
   readonly name: string
   named(name: string): this
@@ -16,7 +18,15 @@ export interface Resource<T = unknown> {
  * Defines a resource. Pass default fields (copied per app) or a factory:
  * `resource({ value: 0 })`, `resource((app) => new Thing(app.config.seed))`.
  */
-export function resource<T extends object>(init: T | ((app: App) => T)): Resource<T> {
+export interface ResourceOptions {
+  /**
+   * false: res.get() returns the raw value instead of a read-only proxy in dev. Use it for
+   * Three.js objects, which break when proxied.
+   */
+  readonlyProxy?: boolean
+}
+
+export function resource<T extends object>(init: T | ((app: App) => T), options: ResourceOptions = {}): Resource<T> {
   const pendingName = takePendingName()
   const create =
     typeof init === 'function'
@@ -25,6 +35,7 @@ export function resource<T extends object>(init: T | ((app: App) => T)): Resourc
   const r: Resource<T> = {
     [$resource]: true,
     create,
+    opaque: options.readonlyProxy === false,
     get name() {
       return nameOf(r, 'Resource')
     },

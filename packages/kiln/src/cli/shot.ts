@@ -1,1 +1,96 @@
-export default async function (): Promise<number> { console.error('not implemented yet'); return 1 }
+import { existsSync, readdirSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join, resolve } from 'node:path'
+import type { Args } from './args.ts'
+import { num } from './args.ts'
+import { KilnError } from '../core/errors.ts'
+
+/** Finds a Chromium for Playwright: its own registry first, then any cached build. */
+export function findChromium(chromium: { executablePath(): string }): string | undefined {
+  try {
+    const p = chromium.executablePath()
+    if (p && existsSync(p)) return p
+  } catch {}
+  const env = process.env.KILN_CHROMIUM ?? process.env.CHROME_PATH
+  if (env && existsSync(env)) return env
+  const roots = [process.env.PLAYWRIGHT_BROWSERS_PATH, join(homedir(), '.cache/ms-playwright'), '/opt/pw-browsers'].filter(Boolean) as string[]
+  for (const root of roots) {
+    if (!existsSync(root)) continue
+    const dirs = readdirSync(root).filter((d) => d.startsWith('chromium')).sort().reverse()
+    for (const d of dirs) {
+      for (const rel of ['chrome-linux64/chrome', 'chrome-linux/chrome', 'chrome-linux/headless_shell', 'chrome-headless-shell-linux64/chrome-headless-shell', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium', 'chrome-win/chrome.exe']) {
+        const p = join(root, d, rel)
+        if (existsSync(p)) return p
+      }
+    }
+  }
+  for (const p of ['/usr/bin/chromium', '/usr/bin/chromium-browser', '/usr/bin/google-chrome']) if (existsSync(p)) return p
+  return undefined
+}
+
+/**
+ * kiln shot [--steps 120] [--seed S] [--width 800] [--height 600] [--webgl] [out.png]
+ * Serves the game with Vite, opens /__kiln/shot in headless Chromium (Playwright), runs N steps,
+ * renders one frame and saves the canvas. Prints one JSON line (or text) with the result and any
+ * console errors.
+ */
+export default async function shot(args: Args, root: string): Promise<number> {
+  const out = resolve(root, args._[0] ?? 'shot.png')
+  const steps = num(args.steps, 60)
+  const width = num(args.width, 800)
+  const height = num(args.height, 600)
+  const { createServer } = await import('vite')
+  const { kiln } = await import('../tooling/vite.ts')
+  const hasConfig = ['vite.config.ts', 'vite.config.js', 'vite.config.mjs'].some((f) => existsSync(join(root, f)))
+  const server = await createServer({
+    root,
+    configFile: hasConfig ? undefined : false,
+    plugins: hasConfig ? [] : [kiln()],
+    logLevel: 'error',
+    server: { port: 0, host: '127.0.0.1', hmr: false },
+    clearScreen: false,
+  })
+  await server.listen()
+  const addr = server.httpServer?.address()
+  const port = typeof addr === 'object' && addr ? addr.port : 5173
+  const { chromium } = await import('playwright-core')
+  const executablePath = findChromium(chromium)
+  if (!executablePath) {
+    await server.close()
+    throw new KilnError(
+      'no-chromium',
+      'kiln shot needs Chromium. Run `bunx playwright install chromium`, or set KILN_CHROMIUM to a Chrome/Chromium binary.',
+    )
+  }
+  const browser = await chromium.launch({
+    executablePath,
+    headless: true,
+    args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
+  })
+  const errors: string[] = []
+  try {
+    const page = await browser.newPage({ viewport: { width, height } })
+    page.on('console', (m) => {
+      if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`)
+    })
+    page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
+    const q = new URLSearchParams({ steps: String(steps), width: String(width), height: String(height) })
+    if (args.seed !== undefined) q.set('seed', String(num(args.seed, 0)))
+    if (args.webgl) q.set('webgl', '1')
+    await page.goto(`http://127.0.0.1:${port}/__kiln/shot?${q}`)
+    await page.waitForFunction(() => (window as any).__kilnShot, null, { timeout: num(args.timeout, 60000) })
+    const result = (await page.evaluate(() => (window as any).__kilnShot)) as { ok: boolean; tick?: number; backend?: string; error?: string; code?: string }
+    if (result.ok) await page.locator('canvas').first().screenshot({ path: out })
+    else await page.screenshot({ path: out })
+    const report = { ...result, out, steps, errors }
+    if (args.json) console.log(JSON.stringify(report))
+    else {
+      console.log(result.ok ? `ok ${out} tick=${result.tick} backend=${result.backend}` : `error ${result.code ?? 'shot'}: ${result.error}`)
+      for (const e of errors) console.log(e)
+    }
+    return result.ok ? 0 : 1
+  } finally {
+    await browser.close()
+    await server.close()
+  }
+}

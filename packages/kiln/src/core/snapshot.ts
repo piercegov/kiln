@@ -32,7 +32,7 @@ export interface SnapshotOptions {
   precision?: number
   /** Leave out struct fields equal to the trait's default, for compact output. */
   omitDefaults?: boolean
-  /** Keep non-JSON values (Three.js objects) by reference. In-memory only; used by hot reload. */
+  /** Keep non-JSON trait values (Three.js objects) by reference. In-memory only; used by hot reload. */
   refs?: boolean
 }
 
@@ -111,12 +111,11 @@ export function takeSnapshot(app: App, opts: SnapshotOptions = {}): Snapshot {
   const snap: Snapshot = { tick: app.time.tick, frame: app.time.frame, entities }
   if (opts.resources) {
     // Time lives in snapshot.tick/frame; `resources: true` means game state.
-    const list = opts.resources === true ? app.resourceList().filter((r) => r.name !== 'Time') : opts.resources
+    const list = opts.resources === true ? app.resourceList().filter((r) => r.name !== 'Time' && !r.opaque) : opts.resources
     const res: Record<string, unknown> = {}
     for (const r of list) {
       const v = app.resource(r)
-      if (opts.refs) res[r.name] = v
-      else if (jsonable(v)) res[r.name] = JSON.parse(JSON.stringify(v))
+      if (jsonable(v)) res[r.name] = JSON.parse(JSON.stringify(v))
     }
     snap.resources = res
   }
@@ -238,12 +237,13 @@ export function restoreSnapshot(app: App, snap: Snapshot): { missingTraits: stri
   app.time.elapsed = snap.tick * app.time.step
   if (snap.resources) {
     for (const r of app.resourceList()) {
-      if (r.name === 'Time') continue
+      if (r.name === 'Time' || r.opaque) continue
       const saved = snap.resources[r.name]
       if (saved === undefined) continue
       const cur = app.resource(r) as any
-      if (typeof cur === 'object' && cur !== null && typeof saved === 'object' && saved !== null && cur !== saved) Object.assign(cur, saved)
-      else if (cur !== saved) app.insert(r, saved)
+      // Plain objects take the saved fields; classes opt in with restore(json).
+      if (typeof cur?.restore === 'function') cur.restore(saved)
+      else if (cur && Object.getPrototypeOf(cur) === Object.prototype && typeof saved === 'object' && saved !== null) Object.assign(cur, structuredClone(saved))
     }
   }
   return { missingTraits: [...missing] }

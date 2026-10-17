@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "scene-fixture",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": ["--bun", "vite", "packages/kiln/test/fixtures/scene", "--port", "5199", "--strictPort"],
+      "port": 5199
+    }
+  ]
+}

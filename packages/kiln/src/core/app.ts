@@ -179,7 +179,7 @@ class ResAccess implements Res {
   get<T>(r: Resource<T>): Readonly<T> {
     this.owner?.resReads.add(r)
     const v = this.app.resource(r)
-    if (!this.app.dev || this.owner?.unchecked || typeof v !== 'object' || v === null) return v
+    if (!this.app.dev || r.opaque || this.owner?.unchecked || typeof v !== 'object' || v === null) return v
     return this.readonly(v as object, r.name, r.name) as T
   }
 
@@ -611,14 +611,20 @@ export class App {
 
   /**
    * Starts the browser loop: runs plugin start hooks (renderer, input devices), Startup, then a
-   * requestAnimationFrame loop. Pass `{ loop: false }` to drive frames yourself (kiln shot does).
+   * requestAnimationFrame loop. Pass `{ loop: false }` to drive frames yourself (kiln shot does),
+   * `{ startup: false }` to skip Startup (when restoring a snapshot).
    */
-  async start(canvas?: HTMLCanvasElement, options: { loop?: boolean } = {}): Promise<this> {
+  async start(canvas?: HTMLCanvasElement, options: { loop?: boolean; startup?: boolean } = {}): Promise<this> {
     try {
       await this.ready()
       this.headless = false
       this.canvas = canvas
       for (const h of this.hooks.start) await h(canvas)
+      if (options.startup === false) {
+        // Restoring a snapshot instead (hot reload): build, but don't spawn the level again.
+        this.build()
+        this.booted = true
+      }
       this.boot()
       if (options.loop !== false && typeof requestAnimationFrame === 'function') {
         let last = performance.now()

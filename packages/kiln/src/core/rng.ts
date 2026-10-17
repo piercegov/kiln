@@ -74,6 +74,14 @@ export class RngState {
   toJSON() {
     return { a: this.a, b: this.b, c: this.c, d: this.d }
   }
+
+  /** Restores state saved by toJSON (snapshots). */
+  restore(s: { a: number; b: number; c: number; d: number }): void {
+    this.a = s.a >>> 0
+    this.b = s.b >>> 0
+    this.c = s.c >>> 0
+    this.d = s.d >>> 0
+  }
 }
 
 /** The app's seeded random number generator. Seeded from `config.seed`. */
