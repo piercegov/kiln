@@ -1,10 +1,6 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { WaveCleared } from '../src/events/wave-cleared.ts'
-import { Level } from '../src/resources/level.ts'
-import { Score } from '../src/resources/score.ts'
-import { IsCoin } from '../src/traits/is-coin.ts'
-import { IsPlayer } from '../src/traits/is-player.ts'
+import { IsCoin, IsPlayer, Level, Score, WaveCleared } from '../src/data.ts'
 
 scenario('clearing a wave spawns the next one with two more coins', ({ app }) => {
   const player = app.query(IsPlayer)[0]!

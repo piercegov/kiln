@@ -1,14 +1,15 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { IsPlayer } from '../../src/traits/is-player.ts'
-import { Level } from '../../src/resources/level.ts'
-import { PLAYER_SPEED } from '../../src/systems/player-move.ts'
+import { IsPlayer, Level } from '../../src/data.ts'
+import { PLAYER_SPEED } from '../../src/systems.ts'
 
-async function dashModule() {
-  return import('../../src/traits/dash.ts')
+async function dashModule(): Promise<any> {
+  const m: any = await import('../../src/data.ts')
+  if (!m.Dash) throw new Error('src/data.ts does not export Dash yet')
+  return m
 }
 
-scenario('Dash is a trait in src/traits/dash.ts', async () => {
+scenario('Dash is a trait exported from src/data.ts', async () => {
   const m = await dashModule()
   expect(typeof m.Dash).toBe('function')
 })

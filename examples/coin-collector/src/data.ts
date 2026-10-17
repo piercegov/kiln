@@ -1,0 +1,47 @@
+import { event, resource, trait, type Entity } from 'kiln'
+
+// Traits
+
+/** Tag: the entity the input controls. */
+export const IsPlayer = trait()
+
+/** Tag: a collectable coin. */
+export const IsCoin = trait()
+
+/** Linear velocity in world units per second. Movement integrates it into Transform. */
+export const Velocity = trait({ x: 0, y: 0, z: 0 })
+
+/** Spins the entity about Y: `speed` in radians per second, `angle` is the current yaw. */
+export const Spin = trait({ speed: 2, angle: 0 })
+
+/** Bobs the entity up and down around `baseY` with `amplitude` and `phase` (radians). */
+export const Bob = trait({ baseY: 0.6, amplitude: 0.15, phase: 0 })
+
+// Resources
+
+/** Coins collected so far. */
+export const Score = resource({ value: 0 })
+
+/** Level layout: arena half-size, coin count per wave, and the current wave number. */
+export const Level = resource({ halfSize: 9, coins: 20, wave: 1 })
+
+/** The score overlay element, or null when headless. */
+export const Hud = resource(
+  (): { el: HTMLDivElement | null } => {
+    if (typeof document === 'undefined') return { el: null }
+    const el = document.createElement('div')
+    el.id = 'hud'
+    el.style.cssText = 'position:fixed;left:16px;top:12px;color:#fff;font:600 20px/1.4 system-ui,sans-serif;text-shadow:0 1px 3px #000;pointer-events:none'
+    document.body.appendChild(el)
+    return { el }
+  },
+  { readonlyProxy: false },
+)
+
+// Events
+
+/** A coin was picked up by `by`. Emitted in Fixed by CollectCoins. */
+export const CoinCollected = event<{ coin: Entity; by: Entity }>()
+
+/** Every coin in the wave was collected. `wave` is the wave just cleared. */
+export const WaveCleared = event<{ wave: number }>()

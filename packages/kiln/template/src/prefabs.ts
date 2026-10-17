@@ -1,7 +1,6 @@
 import * as THREE from 'three'
 import { MeshRef, prefab, Transform, type Vec3 } from 'kiln'
-import { IsPlayer } from '../traits/is-player.ts'
-import { Velocity } from '../traits/velocity.ts'
+import { IsPlayer, Velocity } from './data.ts'
 
 /** The player: a box at `at`. */
 export const Player = prefab((p: { at: Vec3 }) => [

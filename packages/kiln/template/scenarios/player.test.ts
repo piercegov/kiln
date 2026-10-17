@@ -1,6 +1,6 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { IsPlayer } from '../src/traits/is-player.ts'
+import { IsPlayer } from '../src/data.ts'
 
 scenario('the player walks right while right is held', ({ app }) => {
   const p = app.query(IsPlayer)[0]!

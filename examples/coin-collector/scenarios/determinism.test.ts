@@ -1,6 +1,6 @@
 import { expect, scenario, scenarioApp } from 'kiln/test'
 import { Transform } from 'kiln'
-import { IsCoin } from '../src/traits/is-coin.ts'
+import { IsCoin } from '../src/data.ts'
 
 const script = [
   { frame: 1, hold: 'right', frames: 90 },

@@ -1,12 +1,9 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { IsPlayer } from '../../src/traits/is-player.ts'
+import { IsPlayer } from '../../src/data.ts'
 
 async function load() {
-  const [{ RoundTimer }, { RoundOver }] = await Promise.all([
-    import('../../src/resources/round-timer.ts'),
-    import('../../src/events/round-over.ts'),
-  ])
+  const { RoundTimer, RoundOver }: any = await import('../../src/data.ts')
   return { RoundTimer, RoundOver }
 }
 

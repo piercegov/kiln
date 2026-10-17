@@ -1,11 +1,11 @@
 # Kiln
 
 An agent-first game framework on Three.js: a fixed-step loop, a [Koota](https://github.com/pmndrs/koota)
-ECS, and a render bridge, designed so a coding agent can add a feature by writing one file and
-verify it headlessly.
+ECS, and a render bridge, designed so a coding agent can add a feature with a few exports and one
+scheduling line, and verify it headlessly.
 
 ```ts
-// src/systems/movement.ts
+// src/systems.ts
 /** Integrates Velocity into Transform. */
 export const Movement = system([Mut(Transform), Velocity], ([t, v], { time }) => {
   t.x += v.x * time.step

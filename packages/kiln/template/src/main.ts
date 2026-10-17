@@ -1,8 +1,6 @@
 import { chain, createApp, CorePlugins, Fixed, Startup } from 'kiln'
 import config from '../kiln.config.ts'
-import { Movement } from './systems/movement.ts'
-import { PlayerMove } from './systems/player-move.ts'
-import { SpawnLevel } from './systems/spawn-level.ts'
+import { Movement, PlayerMove, SpawnLevel } from './systems.ts'
 
 /** The game: the whole schedule, top to bottom. */
 export default () =>

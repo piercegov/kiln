@@ -1,8 +1,7 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { PLAYER_SPEED } from '../src/systems/player-move.ts'
-import { Level } from '../src/resources/level.ts'
-import { IsPlayer } from '../src/traits/is-player.ts'
+import { IsPlayer, Level } from '../src/data.ts'
+import { PLAYER_SPEED } from '../src/systems.ts'
 
 scenario('up moves away from the camera (-z) at PLAYER_SPEED', ({ app }) => {
   const p = app.query(IsPlayer)[0]!

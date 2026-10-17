@@ -1,9 +1,6 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
-import { CoinCollected } from '../src/events/coin-collected.ts'
-import { Score } from '../src/resources/score.ts'
-import { IsCoin } from '../src/traits/is-coin.ts'
-import { IsPlayer } from '../src/traits/is-player.ts'
+import { CoinCollected, IsCoin, IsPlayer, Score } from '../src/data.ts'
 
 scenario('walking onto a coin collects it', ({ app }) => {
   const player = app.query(IsPlayer)[0]!

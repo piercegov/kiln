@@ -13,7 +13,7 @@ describe('kiln docs', () => {
   test('collects JSDoc for exports, by file', () => {
     const docs = collectDocs(example)
     const movement = docs.find((d) => d.name === 'Movement')!
-    expect(movement).toEqual({ name: 'Movement', kind: 'system', doc: 'Integrates Velocity into Transform.', file: 'src/systems/movement.ts' })
+    expect(movement).toEqual({ name: 'Movement', kind: 'system', doc: 'Integrates Velocity into Transform.', file: 'src/systems.ts' })
     expect(docs.find((d) => d.name === 'Velocity')!.kind).toBe('trait')
     expect(docs.find((d) => d.name === 'Coin')!.kind).toBe('prefab')
   })
@@ -30,8 +30,8 @@ describe('kiln docs', () => {
     const out = renderGameSection(d, collectDocs(example), example)
     expect(out.startsWith(START)).toBe(true)
     expect(out.trimEnd().endsWith(END)).toBe(true)
-    expect(out).toContain('| 1 | Movement | Transform | Velocity | – | – | src/systems/movement.ts |')
-    expect(out).toContain('- **Velocity** (`src/traits/velocity.ts`) `{ x: 0, y: 0, z: 0 }`: Linear velocity')
+    expect(out).toContain('| 1 | Movement | Transform | Velocity | – | – | src/systems.ts |')
+    expect(out).toContain('- **Velocity** (`src/data.ts`) `{ x: 0, y: 0, z: 0 }`: Linear velocity')
   })
 
   test("the example's AGENTS.md is up to date", async () => {

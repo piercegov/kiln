@@ -1,11 +1,9 @@
 import { expect, scenario } from 'kiln/test'
 import { distSq, Transform } from 'kiln'
-import { IsPlayer } from '../../src/traits/is-player.ts'
-import { Level } from '../../src/resources/level.ts'
-import { Score } from '../../src/resources/score.ts'
+import { IsPlayer, Level, Score } from '../../src/data.ts'
 
 async function load() {
-  const [{ IsEnemy }, { PlayerHit }] = await Promise.all([import('../../src/traits/is-enemy.ts'), import('../../src/events/player-hit.ts')])
+  const { IsEnemy, PlayerHit }: any = await import('../../src/data.ts')
   return { IsEnemy, PlayerHit }
 }
 
