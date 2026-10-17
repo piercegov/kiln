@@ -77,8 +77,19 @@ import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, 
 **Access is in the types.** `Mut(T)` is the write set; every other trait in the query is read-only, so
 writing it is a compile error (and a dev error naming the fix). Writes elsewhere: `entity.set(T, {...})`
 only with `Mut(T)` in one of the system's queries; never mutate the object `entity.get(T)` returns
-(it's a copy for struct traits). Structural changes (spawn, despawn, add, remove) always go through
+(it's a copy for struct traits). In the named-query form, `q.each(([t], e) => …)` gives rows like the
+per-entity form; `q.forEach((e) => …)` gives entities, so write those with `e.set(T, {...})`. Several
+named queries may each take `Mut(T)`; the system's write set is their union. Structural changes (spawn, despawn, add, remove) always go through
 `commands`.
+
+**Wiring a new feature into `src/main.ts`:** systems go in `.add(Phase, ...)` (inside the existing
+`chain()` when they touch the same traits); new resources and events go in `.init(...)`. Resources
+also create themselves with their defaults on first use, but listing them in `.init` makes them show
+in `kiln describe` and snapshots from the start.
+
+**Timers:** count steps, not floats. Subtracting `time.step` 3600 times leaves ~1e-12, so a
+`remaining <= 0` check fires one step late. Store a tick count (`time.tick`) or an integer frame
+counter and derive seconds from it, or snap values below `time.step / 2` to zero.
 
 ## Phases (per frame)
 
@@ -112,7 +123,8 @@ Events live for two runs of the phase that emitted them. Startup runs before the
   `Instanced('bullet')` (+ optional `InstanceColor({ r, g, b })`) on each entity.
 - Hierarchy: `ChildOf(parent)`; the child's Transform is local to the parent.
 - `res.mut(Camera)` is a plain Three.js camera (perspective in 3D, orthographic in `mode: '2d'`).
-  `res.get(Scene)` is the scene for lights and backgrounds. Teleport without interpolation: add `Teleported`.
+  `res.get(Scene)` is the scene for lights and backgrounds. Teleport without interpolation: write the
+  Transform and `commands.add(entity, Teleported)` (the tag removes itself after one step).
 - 2D mode keeps the same traits; `z` is draw order and only Z rotation is used.
 - Renderer: `WebGPURenderer` (WebGL2 fallback), Three.js pinned to 0.186.1. Write custom materials
   with TSL (see the cheat sheet below); don't use `ShaderMaterial`/GLSL.
@@ -123,6 +135,9 @@ Events live for two runs of the phase that emitted them. Startup runs before the
 `pressed('jump')` (exactly once per press, also in Fixed), `released(a)`, `value(a)`, `pointer`
 (`x, y, ndcX, ndcY, dx, dy, wheel, down`). Actions: `left right up down jump fire alt interact sprint
 pause`, mapped to keys, mouse and gamepad by the `ActionMap` resource. Scripted input for tests:
+
+Shortcuts take effect on the next step: `app.input.press(a)`, `.release(a)`, `.tap(a)`,
+`.setAxis(x, y)`, `.clearAxis()`, `.reset()`.
 
 ```ts
 app.input.script([
@@ -173,6 +188,13 @@ scenario('player walks right', ({ app }) => {      // fresh app from src/main.ts
   // app.events(E) lists every E emitted during the last step() call.
 }, { seed: 3 })
 ```
+
+Keep scenarios about one thing: put entities where you need them with `app.set(e, Transform, {...})`,
+and despawn what would interfere (`app.query(IsEnemy).forEach((e) => app.despawn(e))`). Long input
+holds run into level geometry (arena walls, ground), so start the player where the run fits.
+
+`app.events(E)` only holds what the last `step()` call emitted. To check "exactly once" over a long
+run, step in chunks and add up the lengths.
 
 App methods for tests and tools: `step(n)`, `spawn(...)`, `despawn(e)`, `get(e, T)`, `set(e, T, {...})`,
 `has(e, T)`, `query(...)`, `res(R)` (mutable), `emit(E, data)`, `events(E)`, `snapshot({ traits,

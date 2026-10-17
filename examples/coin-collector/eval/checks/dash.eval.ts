@@ -1,6 +1,7 @@
 import { expect, scenario } from 'kiln/test'
 import { Transform } from 'kiln'
 import { IsPlayer } from '../../src/traits/is-player.ts'
+import { Level } from '../../src/resources/level.ts'
 import { PLAYER_SPEED } from '../../src/systems/player-move.ts'
 
 async function dashModule() {
@@ -15,6 +16,8 @@ scenario('Dash is a trait in src/traits/dash.ts', async () => {
 scenario('a dash moves 3x faster for 12 steps, then cools down for a second', async ({ app }) => {
   await dashModule()
   const p = app.query(IsPlayer)[0]!
+  // Start at the left wall so the run never reaches the right one.
+  app.set(p, Transform, { x: -app.res(Level).halfSize })
   const x0 = app.get(p, Transform)!.x
   app.input.script([
     { frame: 1, hold: 'right', frames: 200 },

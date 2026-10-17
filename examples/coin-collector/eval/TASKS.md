@@ -32,3 +32,9 @@ Add a 60-second round. Export a `RoundTimer` resource (`{ remaining: 60 }`, seco
 `src/events/round-over.ts`. The timer counts down in Fixed using simulated time. When it reaches
 0 it stays at 0, `RoundOver` is emitted exactly once, and from then on the player no longer moves
 from input. Show the remaining whole seconds in the HUD.
+
+## Results log
+
+- 2026-10-17, first run (one fresh agent per task, given only the task text and the game folder):
+  dash 3/3, chasers 3/3, round-timer 2/2 on the checks; `kiln test` and `kiln check` green in all
+  three. Friction they reported was fixed in the guide and in `kiln docs` (see git log).
