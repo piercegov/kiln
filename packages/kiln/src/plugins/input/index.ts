@@ -35,6 +35,10 @@ export const ActionMap = resource((): ActionBindings => structuredClone(DEFAULT_
 
 const PAD_BUTTONS = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'Back', 'Start', 'LS', 'RS', 'Up', 'Down', 'Left', 'Right']
 const PAD_AXES = ['LX', 'LY', 'RX', 'RY']
+// Binding names built once, so polling a gamepad doesn't build strings every frame.
+const PAD_BUTTON_KEYS = PAD_BUTTONS.map((n) => `Pad:${n}`)
+const PAD_AXIS_POS = PAD_AXES.map((n) => `Pad:${n}+`)
+const PAD_AXIS_NEG = PAD_AXES.map((n) => `Pad:${n}-`)
 const DEADZONE = 0.15
 
 /** Raw device state, written by DOM listeners and gamepad polling. */
@@ -46,6 +50,8 @@ export class RawInput {
   pad = new Map<string, number>()
   stick = { x: 0, y: 0, active: false }
   pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, inside: false }
+  /** Gamepads seen via gamepadconnected. Polling skips navigator.getGamepads() while this is 0. */
+  pads = 0
   clear(): void {
     this.keys.clear()
     this.tapped.clear()
@@ -217,28 +223,42 @@ class Controller implements InputController {
   }
 }
 
+/** Map/Set.clear() allocates a fresh table even when empty, so skip it when there is nothing to clear. */
+function clear(c: { size: number; clear(): void }): void {
+  if (c.size > 0) c.clear()
+}
+
 function bindingValue(b: Binding, raw: RawInput, ctl: Controller): number {
   if (raw.keys.has(b) || raw.tapped.has(b) || ctl.virtualKeys.has(b)) return 1
   return raw.pad.get(b) ?? 0
 }
 
 function pollGamepads(raw: RawInput): void {
-  raw.pad.clear()
+  clear(raw.pad)
   raw.stick.active = false
+  if (raw.pads === 0) return
   const nav = (globalThis as any).navigator
   if (!nav?.getGamepads) return
-  for (const pad of nav.getGamepads() as (Gamepad | null)[]) {
+  const pads = nav.getGamepads() as (Gamepad | null)[]
+  for (let p = 0; p < pads.length; p++) {
+    const pad = pads[p]
     if (!pad) continue
-    pad.buttons.forEach((btn, i) => {
-      const name = PAD_BUTTONS[i]
-      if (name && btn.value > 0) raw.pad.set(`Pad:${name}`, Math.max(raw.pad.get(`Pad:${name}`) ?? 0, btn.value))
-    })
-    pad.axes.forEach((v, i) => {
-      const name = PAD_AXES[i]
-      if (!name || Math.abs(v) < DEADZONE) return
-      const key = `Pad:${name}${v > 0 ? '+' : '-'}`
+    const buttons = pad.buttons
+    const nb = Math.min(buttons.length, PAD_BUTTON_KEYS.length)
+    for (let i = 0; i < nb; i++) {
+      const value = buttons[i]!.value
+      if (value <= 0) continue
+      const key = PAD_BUTTON_KEYS[i]!
+      raw.pad.set(key, Math.max(raw.pad.get(key) ?? 0, value))
+    }
+    const axes = pad.axes
+    const na = Math.min(axes.length, PAD_AXES.length)
+    for (let i = 0; i < na; i++) {
+      const v = axes[i]!
+      if (Math.abs(v) < DEADZONE) continue
+      const key = v > 0 ? PAD_AXIS_POS[i]! : PAD_AXIS_NEG[i]!
       raw.pad.set(key, Math.max(raw.pad.get(key) ?? 0, Math.abs(v)))
-    })
+    }
     const lx = pad.axes[0] ?? 0
     const ly = pad.axes[1] ?? 0
     if (Math.hypot(lx, ly) > DEADZONE) {
@@ -283,6 +303,12 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     raw.pointer.wheel += e.deltaY
   }
   const onContext = (e: Event) => e.preventDefault()
+  const onPadOn = () => raw.pads++
+  const onPadOff = () => {
+    raw.pads = Math.max(0, raw.pads - 1)
+  }
+  // A pad that was connected before this page loaded still fires gamepadconnected on first use.
+  raw.pads = ((globalThis as any).navigator?.getGamepads?.() ?? []).filter(Boolean).length
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('blur', onBlur)
@@ -291,6 +317,8 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
   window.addEventListener('pointerup', onUp)
   target.addEventListener('wheel', onWheel as EventListener, { passive: true })
   canvas?.addEventListener('contextmenu', onContext)
+  window.addEventListener('gamepadconnected', onPadOn)
+  window.addEventListener('gamepaddisconnected', onPadOff)
   void app
   return () => {
     window.removeEventListener('keydown', onKeyDown)
@@ -301,6 +329,8 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     window.removeEventListener('pointerup', onUp)
     target.removeEventListener('wheel', onWheel as EventListener)
     canvas?.removeEventListener('contextmenu', onContext)
+    window.removeEventListener('gamepadconnected', onPadOn)
+    window.removeEventListener('gamepaddisconnected', onPadOff)
   }
 }
 
@@ -319,19 +349,24 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
     if (options.actions) app.insert(ActionMap, structuredClone(options.actions))
     app.init(ActionMap, Input)
 
+    // Two sets swapped each poll, so the held set is never reallocated.
+    let spareDown = new Set<string>()
     const Poll = system(
       ({ res }) => {
         const state = res.mut(Input)
+        // unchecked: the raw map, not a dev read-only proxy (the plugin owns it and only reads it).
         const map = res.get(ActionMap)
         if (!app.headless) pollGamepads(raw)
         const prevDown = state.downSet
-        const nextDown = new Set<string>()
-        state.framePressed.clear()
-        state.frameReleased.clear()
-        state.values.clear()
-        for (const action of Object.keys(map)) {
+        const nextDown = spareDown
+        clear(nextDown)
+        clear(state.framePressed)
+        clear(state.frameReleased)
+        clear(state.values)
+        for (const action in map) {
           let v = ctl.virtual.get(action) ?? 0
-          for (const b of map[action]!) v = Math.max(v, bindingValue(b, raw, ctl))
+          const bindings = map[action]!
+          for (let i = 0; i < bindings.length; i++) v = Math.max(v, bindingValue(bindings[i]!, raw, ctl))
           if (v > 0) state.values.set(action, v)
           if (v >= 0.5) nextDown.add(action)
         }
@@ -354,6 +389,7 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
           }
         }
         state.downSet = nextDown
+        spareDown = prevDown
 
         let x: number
         let y: number
@@ -388,10 +424,10 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
         rp.dx = 0
         rp.dy = 0
         rp.wheel = 0
-        raw.tapped.clear()
+        clear(raw.tapped)
         ctl.observe(state)
       },
-      { name: 'PollInput' },
+      { name: 'PollInput', unchecked: true },
     )
     app.add(InputPhase, Poll)
 
@@ -399,8 +435,8 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
     // pressed()/released() in Fixed are true for the first fixed step after the edge only.
     app.hooks.fixedEnd.push(() => {
       const s = app.resource(Input)
-      s.fixedPressed.clear()
-      s.fixedReleased.clear()
+      clear(s.fixedPressed)
+      clear(s.fixedReleased)
     })
     let detach = () => {}
     app.hooks.start.push((canvas) => {
