@@ -365,6 +365,9 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       const state = app.resource(Renderer)
       state.renderer = renderer
       state.backend = (renderer.backend as any)?.isWebGPUBackend ? 'webgpu' : 'webgl2'
+      // Lets the uncapped browser loop wait for submitted GPU work (see App.runLoop).
+      const device = (renderer.backend as any)?.device as { queue?: { onSubmittedWorkDone?: () => Promise<void> } } | undefined
+      if (device?.queue?.onSubmittedWorkDone) app.ext.gpuFence = () => device.queue!.onSubmittedWorkDone!()
       const camera = app.resource(Camera)
       const resize = () => {
         const w = canvas.clientWidth || canvas.width || 800

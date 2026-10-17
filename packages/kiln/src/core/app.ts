@@ -301,26 +301,28 @@ export class App {
 
   private runLoop(): void {
     const token = ++this.loopToken
+    const alive = () => !this.disposed && token === this.loopToken
     let last = performance.now()
     let nextAllowed = 0
+    // With vsync off, frames run back to back only until shortly before the next display refresh;
+    // then the loop waits for requestAnimationFrame. Running flat out starves the browser's own
+    // rendering step, so the canvas would only reach the screen a dozen times a second.
+    let rafInterval = 1000 / 60
+    let lastRaf = 0
+    let budgetEnd = 0
+    let pumping = false
     const channel = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null
-    const schedule = () => {
-      if (this.frameRate.vsync || !channel) requestAnimationFrame(() => tick())
-      else channel.port2.postMessage(0)
-    }
-    if (channel) channel.port1.onmessage = () => tick()
-    const tick = () => {
-      if (this.disposed || token !== this.loopToken) return
-      const now = performance.now()
+
+    const capOk = (now: number): boolean => {
       const cap = this.frameRate.maxFps
-      if (cap > 0 && now < nextAllowed) {
-        // Uncapped mode would spin on postMessage; wait out the remainder instead.
-        if (!this.frameRate.vsync) setTimeout(tick, Math.max(0, nextAllowed - now - 1))
-        else schedule()
-        return
-      }
-      if (cap > 0) nextAllowed = Math.max(nextAllowed + 1000 / cap, now - 1000 / cap)
-      schedule()
+      if (cap <= 0) return true
+      const iv = 1000 / cap
+      // 1 ms tolerance so a cap equal to the refresh rate isn't missed by rAF jitter.
+      if (now < nextAllowed - 1) return false
+      nextAllowed = now - nextAllowed > iv ? now + iv : nextAllowed + iv
+      return true
+    }
+    const runFrame = (now: number) => {
       this.bus.startRecording()
       const dt = (now - last) / 1000
       last = now
@@ -335,8 +337,48 @@ export class App {
         if (this.hooks.error.length === 0) console.error(err)
       }
     }
-    schedule()
+    const pump = () => {
+      if (!alive() || this.frameRate.vsync) {
+        pumping = false
+        return
+      }
+      const now = performance.now()
+      if (now >= budgetEnd) {
+        pumping = false // leave the rest of this refresh to the browser
+        return
+      }
+      pumping = true
+      if (!capOk(now)) {
+        setTimeout(pump, Math.max(0, Math.min(nextAllowed, budgetEnd) - now - 0.5))
+        return
+      }
+      runFrame(now)
+      // Keep at most one frame of GPU work in flight. Without this backpressure the GPU queue
+      // fills with hundreds of frames and the compositor's own work waits behind them.
+      const fence = this.ext.gpuFence as (() => Promise<unknown>) | undefined
+      if (fence) fence().then(() => channel!.port2.postMessage(0), () => channel!.port2.postMessage(0))
+      else channel!.port2.postMessage(0)
+    }
+    if (channel) channel.port1.onmessage = pump
+    const onRaf = (t: number) => {
+      if (!alive()) return
+      requestAnimationFrame(onRaf)
+      if (lastRaf) {
+        const d = t - lastRaf
+        if (d > 1 && d < 100) rafInterval = rafInterval * 0.9 + d * 0.1
+      }
+      lastRaf = t
+      const now = performance.now()
+      if (this.frameRate.vsync || !channel) {
+        if (capOk(now)) runFrame(now)
+        return
+      }
+      budgetEnd = now + Math.max(1, rafInterval - 2)
+      if (!pumping) pump()
+    }
+    requestAnimationFrame(onRaf)
   }
+
   private appRes: ResAccess
   currentPhase: Phase | null = null
 
