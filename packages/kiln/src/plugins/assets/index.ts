@@ -58,8 +58,11 @@ const isBrowser = () => typeof window !== 'undefined' && typeof document !== 'un
 
 /** Reads a file headlessly from the game's public/ folder. */
 async function readLocal(base: string, path: string): Promise<ArrayBuffer> {
-  const fs = await import('node:fs/promises')
-  const { resolve } = await import('node:path')
+  // Variable specifiers keep browser bundlers from trying to resolve Node built-ins.
+  const fsName = 'node:fs/promises'
+  const pathName = 'node:path'
+  const fs = await import(/* @vite-ignore */ fsName)
+  const { resolve } = await import(/* @vite-ignore */ pathName)
   const file = resolve(base, path.replace(/^\//, ''))
   try {
     const buf = await fs.readFile(file)

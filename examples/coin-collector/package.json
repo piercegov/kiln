@@ -1,0 +1,19 @@
+{
+  "name": "coin-collector",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "kiln test",
+    "describe": "kiln describe",
+    "docs": "kiln docs"
+  },
+  "dependencies": {
+    "kiln": "workspace:*",
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  }
+}

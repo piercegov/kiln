@@ -68,10 +68,12 @@ export default async function shot(args: Args, root: string): Promise<number> {
     args: ['--enable-unsafe-webgpu', '--enable-features=Vulkan', '--use-angle=swiftshader', '--ignore-gpu-blocklist'],
   })
   const errors: string[] = []
+  const warnings: string[] = []
   try {
     const page = await browser.newPage({ viewport: { width, height } })
     page.on('console', (m) => {
-      if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`)
+      if (m.type() === 'error') errors.push(m.text())
+      else if (m.type() === 'warning') warnings.push(m.text())
     })
     page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`))
     const q = new URLSearchParams({ steps: String(steps), width: String(width), height: String(height) })
@@ -82,11 +84,12 @@ export default async function shot(args: Args, root: string): Promise<number> {
     const result = (await page.evaluate(() => (window as any).__kilnShot)) as { ok: boolean; tick?: number; backend?: string; error?: string; code?: string }
     if (result.ok) await page.locator('canvas').first().screenshot({ path: out })
     else await page.screenshot({ path: out })
-    const report = { ...result, out, steps, errors }
+    const report = { ...result, out, steps, errors, warnings }
     if (args.json) console.log(JSON.stringify(report))
     else {
       console.log(result.ok ? `ok ${out} tick=${result.tick} backend=${result.backend}` : `error ${result.code ?? 'shot'}: ${result.error}`)
-      for (const e of errors) console.log(e)
+      for (const e of errors) console.log(`console-error ${e}`)
+      for (const w of warnings) console.log(`console-warning ${w}`)
     }
     return result.ok ? 0 : 1
   } finally {

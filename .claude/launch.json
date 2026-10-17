@@ -4,8 +4,42 @@
     {
       "name": "scene-fixture",
       "runtimeExecutable": "bunx",
-      "runtimeArgs": ["--bun", "vite", "packages/kiln/test/fixtures/scene", "--port", "5199", "--strictPort"],
+      "runtimeArgs": [
+        "--bun",
+        "vite",
+        "packages/kiln/test/fixtures/scene",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
       "port": 5199
+    },
+    {
+      "name": "coin-collector-prod",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": [
+        "--bun",
+        "vite",
+        "preview",
+        "examples/coin-collector",
+        "--port",
+        "5198",
+        "--strictPort"
+      ],
+      "port": 5198
+    },
+    {
+      "name": "coin-collector",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": [
+        "--bun",
+        "vite",
+        "examples/coin-collector",
+        "--port",
+        "5197",
+        "--strictPort"
+      ],
+      "port": 5197
     }
   ]
 }

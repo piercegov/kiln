@@ -1,0 +1,6 @@
+{
+  "name": "audio",
+  "description": "Positional sounds tied to Transform on Web Audio, plus a PlaySound one-shot event. No-op headless.",
+  "files": ["index.ts", "README.md"],
+  "requires": []
+}

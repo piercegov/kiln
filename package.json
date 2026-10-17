@@ -2,7 +2,10 @@
   "name": "kiln-monorepo",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*", "examples/*"],
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit -p ."

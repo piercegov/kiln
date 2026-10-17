@@ -4,6 +4,9 @@ export interface Args {
   [key: string]: string | boolean | string[]
 }
 
+/** Flags that never take a value, so `--json out.png` keeps out.png positional. */
+const BOOLEAN = new Set(['json', 'force', 'list', 'check', 'pretty', 'full', 'webgl', 'guide', 'help'])
+
 export function parseArgs(argv: string[]): Args {
   const out: Args = { _: [] }
   for (let i = 0; i < argv.length; i++) {
@@ -19,6 +22,7 @@ export function parseArgs(argv: string[]): Args {
         const key = a.slice(2)
         const next = argv[i + 1]
         if (key.startsWith('no-')) out[key.slice(3)] = false
+        else if (BOOLEAN.has(key)) out[key] = true
         else if (next !== undefined && !next.startsWith('--')) {
           out[key] = next
           i++

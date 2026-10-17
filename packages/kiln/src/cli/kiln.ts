@@ -7,6 +7,8 @@
  *   kiln check               determinism lint (Math.random, Date.now in systems)
  *   kiln shot out.png        one rendered frame from headless Chromium
  *   kiln add <plugin>        copy a community plugin into src/plugins/
+ *   kiln docs                write AGENTS.md (guide + generated game section)
+ *   kiln new <dir>           create a game from the template
  */
 import '../tooling/preload.ts'
 import { parseArgs, type Args } from './args.ts'
@@ -23,6 +25,8 @@ commands
   shot [--steps N] [--seed S] [--width W] [--height H] out.png
                                      one rendered frame from headless Chromium
   add <plugin> [--list] [--force]    copy a community plugin into src/plugins/
+  docs [--check]                     write AGENTS.md: the Kiln guide plus this game's schedule and JSDoc
+  new <dir>                          create a game from the template
 
 options
   --cwd DIR                          game folder (default: current directory)
@@ -37,6 +41,8 @@ const commands: Record<string, () => Promise<{ default: Command }>> = {
   check: () => import('./check.ts'),
   shot: () => import('./shot.ts'),
   add: () => import('./add.ts'),
+  docs: () => import('./docs.ts'),
+  new: () => import('./new.ts'),
 }
 
 async function main(argv: string[]): Promise<number> {

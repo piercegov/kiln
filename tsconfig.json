@@ -15,5 +15,5 @@
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": false
   },
-  "include": ["packages/*/src", "packages/*/test", "examples/*/src", "examples/*/scenarios", "examples/*/*.ts"]
+  "include": ["packages/*/src", "packages/*/test", "packages/*/community", "packages/*/template", "examples/*/src", "examples/*/scenarios", "examples/*/*.ts"]
 }

@@ -1,0 +1,6 @@
+{
+  "name": "particles",
+  "description": "Visual-only particle emitters: one InstancedMesh per emitter, seeded from the app Rng.",
+  "files": ["index.ts", "README.md"],
+  "requires": []
+}

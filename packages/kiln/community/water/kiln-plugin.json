@@ -1,0 +1,6 @@
+{
+  "name": "water",
+  "description": "Animated water plane with a TSL shader: GPU sine-wave displacement, analytic normals, deterministic time.",
+  "files": ["index.ts", "README.md"],
+  "requires": []
+}

@@ -1,0 +1,6 @@
+{
+  "name": "terrain",
+  "description": "Procedural heightfield terrain from seeded value noise, with vertex colours and a headless height sampler.",
+  "files": ["index.ts", "README.md"],
+  "requires": []
+}
