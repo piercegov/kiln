@@ -10,11 +10,20 @@ describe('vite plugin', () => {
     expect(factoryKinds('export const T = trait({ x: 0 })\nexport const H = event<{ a: 1 }>()')).toEqual(['trait', 'event'])
   })
 
-  test('names transform keeps generics and member calls valid', () => {
-    const out = addNames('export const Hit = event<{ a: number }>()\nconst p = kiln.prefab((x) => [])\n')!
-    expect(out).toContain('export const Hit = void globalThis.__kiln_n?.("Hit") ?? event<{ a: number }>()')
-    expect(out).toContain('globalThis.__kiln_name?.(Hit, "Hit")')
-    expect(out).toContain('const p = void globalThis.__kiln_n?.("p") ?? kiln.prefab(')
+  test('names transform wraps the whole call, at any depth', () => {
+    const src = [
+      'export const Hit = event<{ a: number }>()',
+      'function f() {',
+      '  const Movement = system([Mut(Transform), trait()], ([t]) => { t.x += ")" + `${1}` }).named("M2")',
+      '}',
+      'const R = /\\)/.test("x") ? 1 : 2',
+    ].join('\n')
+    const out = addNames(src)!
+    const N = '(globalThis.__kiln_named ?? ((_n, v) => v))'
+    expect(out).toContain(`export const Hit = ${N}("Hit", event<{ a: number }>())`)
+    expect(out).toContain(`const Movement = ${N}("Movement", system([Mut(Transform), trait()], ([t]) => { t.x += ")" + \`\${1}\` })).named("M2")`)
+    expect(out).toContain('const R = /\\)/.test')
+    expect(() => new Function(out.replace(/export /g, '').replace(/<\{ a: number \}>/, ''))).not.toThrow()
   })
 })
 

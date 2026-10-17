@@ -1,5 +1,5 @@
 import type { ConfigurableTrait } from 'koota'
-import { nameOf, setName, takePendingName } from './names.ts'
+import { nameOf, setName } from './names.ts'
 
 export const $prefab = Symbol.for('kiln.prefab')
 
@@ -17,7 +17,6 @@ export interface Prefab<P = void> {
  * then `commands.spawn(Enemy, { at })`.
  */
 export function prefab<P = void>(build: (params: P) => ConfigurableTrait[]): Prefab<P> {
-  const pendingName = takePendingName()
   const p: Prefab<P> = {
     [$prefab]: true,
     build,
@@ -29,7 +28,6 @@ export function prefab<P = void>(build: (params: P) => ConfigurableTrait[]): Pre
       return p
     },
   }
-  if (pendingName) setName(p, pendingName)
   return p
 }
 

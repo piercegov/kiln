@@ -5,10 +5,11 @@ import { plugin, type Plugin } from '../../core/plugin.ts'
 import { resource } from '../../core/resource.ts'
 import { Render } from '../../core/schedule.ts'
 import { system } from '../../core/system.ts'
+import { KilnError } from '../../core/errors.ts'
 import { ChildOf, Transform } from '../../core/transform.ts'
-import { MeshRef, SharedMesh, Teleported } from './traits.ts'
+import { Instanced, InstanceColor, MeshRef, SharedMesh, Teleported } from './traits.ts'
 
-export { MeshRef, SharedMesh, Teleported } from './traits.ts'
+export { Instanced, InstanceColor, MeshRef, SharedMesh, Teleported } from './traits.ts'
 
 const ENTITY_ID_MASK = (1 << 20) - 1
 const F = 10 // floats per transform: x y z qx qy qz qw sx sy sz
@@ -95,6 +96,26 @@ class PrevTransforms {
     for (let k = 0; k < F; k++) this.data[o + k] = store[FIELDS[k]!][eid]
     this.tick[eid] = tick
   }
+}
+
+export interface InstancedDefinition {
+  geometry: THREE.BufferGeometry
+  material: THREE.Material
+  /** Starting capacity; grows by doubling. Default 256. */
+  capacity?: number
+  castShadow?: boolean
+  receiveShadow?: boolean
+}
+
+const instancedDefs = new Map<string, InstancedDefinition>()
+
+/**
+ * Registers a shared mesh for `Instanced(key)` entities. Geometry and material are shared by every
+ * app and never disposed by Kiln.
+ */
+export function defineInstanced(key: string, def: InstancedDefinition): string {
+  instancedDefs.set(key, def)
+  return key
 }
 
 const _pos = new THREE.Vector3()
@@ -243,6 +264,87 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       { name: 'RenderSync', reads: [Transform, MeshRef], unchecked: true },
     )
 
+    // ---- Instancing: one InstancedMesh per key, matrices rewritten each frame.
+    const instMeshes = new Map<string, { mesh: THREE.InstancedMesh; count: number; colored: boolean }>()
+    const tmpObj = new THREE.Object3D()
+    const tmpMat = new THREE.Matrix4()
+    const tmpColor = new THREE.Color()
+    const counts = new Map<string, number>()
+    function instMesh(key: string, need: number) {
+      let rec = instMeshes.get(key)
+      if (rec && rec.mesh.instanceMatrix.count >= need) return rec
+      const def = instancedDefs.get(key)
+      if (!def) {
+        throw new KilnError(
+          'unknown-instanced',
+          `An entity has Instanced('${key}') but no mesh is defined for '${key}'. Call defineInstanced('${key}', { geometry, material }) in a module the game imports.`,
+        )
+      }
+      let cap = rec?.mesh.instanceMatrix.count ?? def.capacity ?? 256
+      while (cap < need) cap *= 2
+      const mesh = new THREE.InstancedMesh(def.geometry, def.material, cap)
+      mesh.frustumCulled = false
+      mesh.castShadow = def.castShadow ?? false
+      mesh.receiveShadow = def.receiveShadow ?? false
+      mesh.name = `instanced:${key}`
+      mesh.userData.kilnShared = true
+      if (rec) {
+        scene.remove(rec.mesh)
+        rec.mesh.dispose()
+      }
+      scene.add(mesh)
+      rec = { mesh, count: 0, colored: false }
+      instMeshes.set(key, rec)
+      return rec
+    }
+    app.hooks.dispose.push(() => {
+      for (const r of instMeshes.values()) {
+        scene.remove(r.mesh)
+        r.mesh.dispose()
+      }
+      instMeshes.clear()
+    })
+
+    /** Writes Instanced entities' interpolated transforms into their shared InstancedMesh. */
+    const InstanceSync = system(
+      ({ time }) => {
+        const ents = world.query(Instanced, Transform)
+        for (const r of instMeshes.values()) r.count = 0
+        if (ents.length > 0) {
+          const keys = getStore(world, Instanced) as string[]
+          counts.clear()
+          for (let i = 0; i < ents.length; i++) {
+            const k = keys[(ents[i]! as number) & ENTITY_ID_MASK]!
+            counts.set(k, (counts.get(k) ?? 0) + 1)
+          }
+          for (const [k, n] of counts) instMesh(k, n)
+          for (let i = 0; i < ents.length; i++) {
+            const e = ents[i]!
+            const rec = instMeshes.get(keys[(e as number) & ENTITY_ID_MASK]!)!
+            if (e.targetFor(ChildOf) !== undefined) tmpMat.copy(worldMatrix(e, time.alpha))
+            else {
+              writeTransform(e, tmpObj, time.alpha)
+              tmpMat.compose(tmpObj.position, tmpObj.quaternion, tmpObj.scale)
+            }
+            rec.mesh.setMatrixAt(rec.count, tmpMat)
+            const c = e.get(InstanceColor)
+            if (c || rec.colored) {
+              tmpColor.setRGB(c?.r ?? 1, c?.g ?? 1, c?.b ?? 1)
+              rec.mesh.setColorAt(rec.count, tmpColor)
+              rec.colored = true
+            }
+            rec.count++
+          }
+        }
+        for (const r of instMeshes.values()) {
+          r.mesh.count = r.count
+          r.mesh.instanceMatrix.needsUpdate = true
+          if (r.mesh.instanceColor) r.mesh.instanceColor.needsUpdate = true
+        }
+      },
+      { name: 'InstanceSync', reads: [Transform, Instanced, InstanceColor], unchecked: true },
+    )
+
     /** Draws the scene. */
     const Draw = system(
       ({ res }) => {
@@ -252,7 +354,7 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       },
       { name: 'Draw' },
     )
-    app.add(Render, RenderSync, Draw.after(RenderSync))
+    app.add(Render, RenderSync, InstanceSync.after(RenderSync), Draw.after(RenderSync, InstanceSync))
 
     app.hooks.start.push(async (canvas) => {
       if (!canvas || typeof window === 'undefined') return

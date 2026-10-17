@@ -1,4 +1,4 @@
-import { nameOf, setName, takePendingName } from './names.ts'
+import { nameOf, setName } from './names.ts'
 
 export const $event = Symbol.for('kiln.event')
 
@@ -13,7 +13,6 @@ export interface EventType<T = void> {
 
 /** Defines a typed event. Events live for two runs of the phase that emitted them. */
 export function event<T = void>(): EventType<T> {
-  const pendingName = takePendingName()
   const e: EventType<T> = {
     [$event]: true,
     get name() {
@@ -24,7 +23,6 @@ export function event<T = void>(): EventType<T> {
       return e
     },
   }
-  if (pendingName) setName(e, pendingName)
   return e
 }
 

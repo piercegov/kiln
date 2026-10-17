@@ -132,3 +132,39 @@ test('core never imports Three.js', () => {
     expect({ f, three: /from ['"]three/.test(src.replace(/import type[^\n]*/g, '')) }).toEqual({ f, three: false })
   }
 })
+
+describe('instancing', () => {
+  test('Instanced entities share one InstancedMesh per key, interpolated and coloured', async () => {
+    const { defineInstanced, Instanced, InstanceColor } = await import('../src/index.ts')
+    defineInstanced('test-bullet', { geometry: new THREE.SphereGeometry(0.1), material: new THREE.MeshBasicMaterial(), capacity: 2 })
+    defineInstanced('test-tree', { geometry: new THREE.ConeGeometry(), material: new THREE.MeshBasicMaterial() })
+    const app = mk()
+    for (let i = 0; i < 5; i++) app.spawn(Transform({ x: i }), Instanced('test-bullet'), InstanceColor({ r: 1, g: 0, b: 0 }))
+    app.spawn(Transform({ z: 3 }), Instanced('test-tree'))
+    await app.start(undefined, { loop: false })
+    app.render()
+    const scene = app.res(Scene)
+    const bullets = scene.getObjectByName('instanced:test-bullet') as THREE.InstancedMesh
+    const trees = scene.getObjectByName('instanced:test-tree') as THREE.InstancedMesh
+    expect(bullets.count).toBe(5)
+    expect(bullets.instanceMatrix.count).toBe(8) // grew from 2 by doubling
+    expect(trees.count).toBe(1)
+    const m = new THREE.Matrix4()
+    bullets.getMatrixAt(4, m)
+    expect(new THREE.Vector3().setFromMatrixPosition(m).x).toBe(4)
+    const c = new THREE.Color()
+    bullets.getColorAt(0, c)
+    expect([c.r, c.g, c.b]).toEqual([1, 0, 0])
+    app.despawn(app.query(Instanced)[0]!)
+    app.render()
+    expect(bullets.count + trees.count).toBe(5)
+  })
+
+  test('unknown instanced keys name the fix', async () => {
+    const { Instanced } = await import('../src/index.ts')
+    const app = mk()
+    app.spawn(Transform, Instanced('nope'))
+    await app.start(undefined, { loop: false })
+    expect(() => app.render()).toThrow("Call defineInstanced('nope', { geometry, material })")
+  })
+})

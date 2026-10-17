@@ -1,5 +1,5 @@
 import type { App } from './app.ts'
-import { nameOf, setName, takePendingName } from './names.ts'
+import { nameOf, setName } from './names.ts'
 
 export const $plugin = Symbol.for('kiln.plugin')
 
@@ -16,7 +16,6 @@ export interface Plugin {
  * `scenario()` does so for you.
  */
 export function plugin(build: (app: App) => void | Promise<void>, name?: string): Plugin {
-  const pendingName = takePendingName()
   const p: Plugin = {
     [$plugin]: true,
     build,
@@ -28,7 +27,6 @@ export function plugin(build: (app: App) => void | Promise<void>, name?: string)
       return p
     },
   }
-  if (pendingName) setName(p, pendingName)
   if (name) setName(p, name, true)
   return p
 }

@@ -2,7 +2,7 @@ import type { Entity, Trait, World } from 'koota'
 import type { NamedQueries, QueryList, QueryViews, Row } from './access.ts'
 import type { Commands } from './commands.ts'
 import type { Events } from './event.ts'
-import { nameOf, setName, takePendingName } from './names.ts'
+import { nameOf, setName } from './names.ts'
 import type { Resource } from './resource.ts'
 
 export const $system = Symbol.for('kiln.system')
@@ -123,7 +123,6 @@ export function system<const Q extends NamedQueries>(
   options?: SystemOptions,
 ): System
 export function system(a: any, b?: any, c?: any): System {
-  const pendingName = takePendingName()
   let form: SystemForm
   let query: QueryList | NamedQueries | null
   let fn: (...args: any[]) => void
@@ -168,7 +167,6 @@ export function system(a: any, b?: any, c?: any): System {
     after: (...t) => makeEntry(s, t, []),
     before: (...t) => makeEntry(s, [], t),
   }
-  if (pendingName) setName(s, pendingName)
   if (options.name) setName(s, options.name, true)
   return s
 }

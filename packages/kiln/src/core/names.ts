@@ -49,16 +49,8 @@ export function traitName(t: Trait): string {
   return nameOf(t, `Trait#${t.id}`)
 }
 
-let pending: string | null = null
-
-/** Takes the name the transform announced for the factory call that is starting, if any. */
-export function takePendingName(): string | null {
-  const n = pending
-  pending = null
-  return n
-}
-
 ;(globalThis as any).__kiln_name = (obj: unknown, name: string) => setName(obj, name)
-;(globalThis as any).__kiln_n = (name: string) => {
-  pending = name
+;(globalThis as any).__kiln_named = <T>(name: string, obj: T): T => {
+  setName(obj, name)
+  return obj
 }

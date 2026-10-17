@@ -1,5 +1,5 @@
 import type { App } from './app.ts'
-import { nameOf, setName, takePendingName } from './names.ts'
+import { nameOf, setName } from './names.ts'
 
 export const $resource = Symbol.for('kiln.resource')
 
@@ -27,7 +27,6 @@ export interface ResourceOptions {
 }
 
 export function resource<T extends object>(init: T | ((app: App) => T), options: ResourceOptions = {}): Resource<T> {
-  const pendingName = takePendingName()
   const create =
     typeof init === 'function'
       ? (init as (app: App) => T)
@@ -44,7 +43,6 @@ export function resource<T extends object>(init: T | ((app: App) => T), options:
       return r
     },
   }
-  if (pendingName) setName(r, pendingName)
   return r
 }
 

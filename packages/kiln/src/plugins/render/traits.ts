@@ -14,3 +14,12 @@ export const SharedMesh = trait()
 
 /** Snap to the current Transform on the next frame instead of interpolating (teleports). */
 export const Teleported = trait()
+
+/**
+ * Renders this entity as one instance of a shared InstancedMesh: `Instanced('bullet')`, after
+ * `defineInstanced('bullet', { geometry, material })`. The default path for crowds, bullets, foliage.
+ */
+export const Instanced = trait(() => '' as string)
+
+/** Per-instance colour for Instanced entities (multiplies the material colour). */
+export const InstanceColor = trait({ r: 1, g: 1, b: 1 })
