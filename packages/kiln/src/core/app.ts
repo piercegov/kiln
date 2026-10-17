@@ -12,6 +12,7 @@ import { CommandQueue, Commands } from './commands.ts'
 import { defaultDev } from './dev.ts'
 import { KilnError } from './errors.ts'
 import { Events, EventBus, isEvent, type EventType } from './event.ts'
+import { describeApp, type AppDescription } from './describe.ts'
 import { guard, installEntityGuards, readonlyWorld, type GuardTarget } from './guard.ts'
 import { nameOf } from './names.ts'
 import { isPlugin, type Plugin, type PluginLike } from './plugin.ts'
@@ -710,6 +711,11 @@ export class App {
     return this.bus.recorded(e)
   }
 
+  /** The built app as data: phases, systems with reads/writes/order, traits, resources, events. */
+  describe(): AppDescription {
+    return describeApp(this)
+  }
+
   /** Resource access with the same read-only rules systems get. */
   get resAccess(): Res {
     return this.appRes
@@ -726,5 +732,7 @@ function wrapSystemError(err: unknown, cs: CompiledSystem): unknown {
 
 /** Creates an app. 3D by default; pass `{ mode: '2d' }` for 2D. */
 export function createApp(config: KilnConfig = {}): App {
-  return new App(config)
+  // The CLI and scenario runner can override config (e.g. --seed) without editing the game.
+  const overrides = (globalThis as any).__KILN_OVERRIDES__ as KilnConfig | undefined
+  return new App(overrides ? { ...config, ...overrides } : config)
 }
