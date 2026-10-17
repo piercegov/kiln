@@ -47,6 +47,10 @@ class DebugUI {
   private resources = { json: '' }
   private inspect = { id: 1 }
   private timer: ReturnType<typeof setInterval>
+  private graphTimer: ReturnType<typeof setInterval>
+  private graph: FpsGraph
+  private gFrame = 0
+  private gTime = performance.now()
   private entityFolder: any
   private onKey: (e: KeyboardEvent) => void
   private lastFrame = 0
@@ -58,10 +62,11 @@ class DebugUI {
     private host: HTMLElement,
   ) {
     const f = pane.addFolder({ title: 'Stats' })
-    // Graph frame time, not fps: it stays readable from 30 Hz to uncapped 300+ fps displays.
-    f.addBinding(this.stats, 'ms', { readonly: true, view: 'graph', min: 0, max: 50, label: 'frame ms' })
-    f.addBinding(this.stats, 'ms', { readonly: true, label: 'frame ms', format: (v: number) => v.toFixed(2) })
+    this.graph = new FpsGraph()
+    const content = (f.element as HTMLElement).querySelector('.tp-fldv_c') ?? f.element
+    content.prepend(this.graph.el)
     f.addBinding(this.stats, 'fps', { readonly: true, format: (v: number) => v.toFixed(0) })
+    f.addBinding(this.stats, 'ms', { readonly: true, label: 'frame ms', format: (v: number) => v.toFixed(2) })
     for (const k of ['frame', 'tick', 'entities'] as const) f.addBinding(this.stats, k, { readonly: true, format: (v: number) => v.toFixed(0) })
     f.addBinding(this.stats, 'backend', { readonly: true })
 
@@ -123,6 +128,13 @@ class DebugUI {
     }
     window.addEventListener('keydown', this.onKey)
     this.timer = setInterval(() => this.refresh(), 250)
+    this.graphTimer = setInterval(() => {
+      const now = performance.now()
+      const frames = app.time.frame - this.gFrame
+      if (now > this.gTime) this.graph.push((frames * 1000) / (now - this.gTime))
+      this.gFrame = app.time.frame
+      this.gTime = now
+    }, 100)
   }
 
   private entityById(id: number): Entity | undefined {
@@ -190,8 +202,85 @@ class DebugUI {
 
   dispose(): void {
     clearInterval(this.timer)
+    clearInterval(this.graphTimer)
     window.removeEventListener('keydown', this.onKey)
     this.pane.dispose()
     this.host.remove()
+  }
+}
+
+/**
+ * FPS over the last 12 seconds. The y range follows the window: top is the max +10%, bottom the
+ * min −10%, both labelled, so small swings are visible at 30 fps and at 1000+ fps alike.
+ */
+class FpsGraph {
+  readonly el: HTMLDivElement
+  private canvas: HTMLCanvasElement
+  private samples: number[] = []
+  private readonly size = 120
+
+  constructor() {
+    this.el = document.createElement('div')
+    this.el.style.cssText = 'padding:4px 4px 2px'
+    this.canvas = document.createElement('canvas')
+    this.canvas.style.cssText = 'display:block;width:100%;height:72px;border-radius:2px;background:rgba(0,0,0,.25)'
+    this.el.appendChild(this.canvas)
+  }
+
+  push(fps: number): void {
+    this.samples.push(fps)
+    if (this.samples.length > this.size) this.samples.shift()
+    this.draw()
+  }
+
+  private draw(): void {
+    const c = this.canvas
+    const dpr = window.devicePixelRatio || 1
+    const w = Math.max(1, Math.round(c.clientWidth * dpr))
+    const h = Math.max(1, Math.round(c.clientHeight * dpr))
+    if (c.width !== w || c.height !== h) {
+      c.width = w
+      c.height = h
+    }
+    const g = c.getContext('2d')
+    if (!g || this.samples.length === 0) return
+    let lo = Math.min(...this.samples)
+    let hi = Math.max(...this.samples)
+    lo *= 0.9
+    hi *= 1.1
+    if (hi - lo < 1) {
+      lo -= 0.5
+      hi += 0.5
+    }
+    g.clearRect(0, 0, w, h)
+    const labelW = 34 * dpr
+    const plotW = w - labelW
+    const y = (v: number) => h - ((v - lo) / (hi - lo)) * h
+    // Line, newest on the right.
+    g.strokeStyle = '#7ee787'
+    g.lineWidth = 1.5 * dpr
+    g.beginPath()
+    const n = this.samples.length
+    this.samples.forEach((v, i) => {
+      const x = labelW + plotW * ((this.size - n + i) / (this.size - 1))
+      if (i === 0) g.moveTo(x, y(v))
+      else g.lineTo(x, y(v))
+    })
+    g.stroke()
+    // Bound labels and guide lines.
+    g.fillStyle = 'rgba(200,205,215,.85)'
+    g.font = `${10 * dpr}px ui-monospace, monospace`
+    g.textBaseline = 'top'
+    g.fillText(hi.toFixed(0), 2 * dpr, 2 * dpr)
+    g.textBaseline = 'bottom'
+    g.fillText(lo.toFixed(0), 2 * dpr, h - 2 * dpr)
+    g.strokeStyle = 'rgba(255,255,255,.08)'
+    g.lineWidth = 1
+    g.beginPath()
+    g.moveTo(labelW, 0.5)
+    g.lineTo(w, 0.5)
+    g.moveTo(labelW, h - 0.5)
+    g.lineTo(w, h - 0.5)
+    g.stroke()
   }
 }
