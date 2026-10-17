@@ -83,6 +83,24 @@ class DebugUI {
       void navigator.clipboard?.writeText(JSON.stringify(snap, null, 2)).catch(() => {})
     })
 
+    // Frame pacing, remembered per browser.
+    try {
+      const saved = JSON.parse(localStorage.getItem('kiln.frameRate') ?? 'null')
+      if (saved && typeof saved.vsync === 'boolean') Object.assign(app.frameRate, { vsync: saved.vsync, maxFps: Number(saved.maxFps) || 0 })
+    } catch {}
+    const save = () => {
+      try {
+        localStorage.setItem('kiln.frameRate', JSON.stringify(app.frameRate))
+      } catch {}
+    }
+    ctl.addBinding(app.frameRate, 'vsync').on('change', save)
+    ctl
+      .addBinding(app.frameRate, 'maxFps', {
+        label: 'fps cap',
+        options: { off: 0, '30': 30, '60': 60, '120': 120, '144': 144, '240': 240, '500': 500 },
+      })
+      .on('change', save)
+
     const sys = pane.addFolder({ title: 'Systems (ms)', expanded: false })
     for (const p of PHASES) {
       for (const cs of app.systemsIn(p)) {

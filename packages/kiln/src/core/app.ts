@@ -53,6 +53,10 @@ export interface KilnConfig {
   dev?: boolean
   /** Frame delta clamp in seconds, so a tab-away doesn't spiral. Default 0.25. */
   maxFrameDt?: number
+  /** Pace browser frames with the display (requestAnimationFrame). Default true. */
+  vsync?: boolean
+  /** Cap on browser frames per second; 0 means no cap. Default 0. */
+  maxFps?: number
   /** Most fixed steps per frame. Default 5. */
   maxFixedSteps?: number
   /** Module whose default export builds the app, for the CLI and scenarios. Default 'src/main.ts'. */
@@ -75,6 +79,8 @@ function resolveConfig(c: KilnConfig): ResolvedConfig {
     dev: c.dev ?? defaultDev(),
     maxFrameDt: c.maxFrameDt ?? 0.25,
     maxFixedSteps: c.maxFixedSteps ?? 5,
+    vsync: c.vsync ?? true,
+    maxFps: c.maxFps ?? 0,
     entry: c.entry ?? 'src/main.ts',
   }
 }
@@ -284,13 +290,61 @@ export class App {
   private booted = false
   private disposed = false
   private acc = 0
-  private raf = 0
+  private loopToken = 0
+  /**
+   * Browser loop pacing. `vsync: true` (default) paces frames with requestAnimationFrame;
+   * `false` runs frames back to back (the compositor still presents at the display rate, so this
+   * measures throughput). `maxFps` caps frames per second in either mode; 0 means no cap.
+   * Change these at runtime; the debug panel has controls for both.
+   */
+  readonly frameRate = { vsync: true, maxFps: 0 }
+
+  private runLoop(): void {
+    const token = ++this.loopToken
+    let last = performance.now()
+    let nextAllowed = 0
+    const channel = typeof MessageChannel !== 'undefined' ? new MessageChannel() : null
+    const schedule = () => {
+      if (this.frameRate.vsync || !channel) requestAnimationFrame(() => tick())
+      else channel.port2.postMessage(0)
+    }
+    if (channel) channel.port1.onmessage = () => tick()
+    const tick = () => {
+      if (this.disposed || token !== this.loopToken) return
+      const now = performance.now()
+      const cap = this.frameRate.maxFps
+      if (cap > 0 && now < nextAllowed) {
+        // Uncapped mode would spin on postMessage; wait out the remainder instead.
+        if (!this.frameRate.vsync) setTimeout(tick, Math.max(0, nextAllowed - now - 1))
+        else schedule()
+        return
+      }
+      if (cap > 0) nextAllowed = Math.max(nextAllowed + 1000 / cap, now - 1000 / cap)
+      schedule()
+      this.bus.startRecording()
+      const dt = (now - last) / 1000
+      last = now
+      try {
+        if (this.paused) {
+          if (!this.headless) this.render()
+        } else this.frame(dt, false)
+      } catch (err) {
+        // Stop on the first error instead of flooding the console every frame.
+        this.paused = true
+        for (const h of this.hooks.error) void h(err)
+        if (this.hooks.error.length === 0) console.error(err)
+      }
+    }
+    schedule()
+  }
   private appRes: ResAccess
   currentPhase: Phase | null = null
 
   constructor(config: KilnConfig = {}) {
     this.config = resolveConfig(config)
     this.dev = this.config.dev
+    this.frameRate.vsync = this.config.vsync
+    this.frameRate.maxFps = this.config.maxFps
     try {
       this.world = createWorld()
     } catch (err) {
@@ -649,27 +703,7 @@ export class App {
         this.booted = true
       }
       this.boot()
-      if (options.loop !== false && typeof requestAnimationFrame === 'function') {
-        let last = performance.now()
-        const loop = (now: number) => {
-          if (this.disposed) return
-          this.raf = requestAnimationFrame(loop)
-          this.bus.startRecording()
-          const dt = (now - last) / 1000
-          last = now
-          try {
-            if (this.paused) {
-              if (!this.headless) this.render()
-            } else this.frame(dt, false)
-          } catch (err) {
-            // Stop on the first error instead of flooding the console every frame.
-            this.paused = true
-            for (const h of this.hooks.error) void h(err)
-            if (this.hooks.error.length === 0) console.error(err)
-          }
-        }
-        this.raf = requestAnimationFrame(loop)
-      }
+      if (options.loop !== false && typeof requestAnimationFrame === 'function') this.runLoop()
       return this
     } catch (err) {
       console.error(err)
@@ -689,7 +723,7 @@ export class App {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
-    if (this.raf && typeof cancelAnimationFrame === 'function') cancelAnimationFrame(this.raf)
+    this.loopToken++
     for (const h of this.hooks.dispose) void h()
     this.bus.clear()
     this.queue.clear()

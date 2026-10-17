@@ -24,7 +24,7 @@ scenario test → `kiln test` → `kiln shot` only if the change is visual.
 ## Files
 
 ```
-kiln.config.ts           fixedHz, seed, mode ('3d' | '2d'), hotReload ('keep' | 'snapshot' | false)
+kiln.config.ts           fixedHz, seed, mode ('3d' | '2d'), hotReload ('keep' | 'snapshot' | false), vsync, maxFps
 src/main.ts              default-exports () => createApp(config)...: the whole schedule
 src/traits/x-y.ts        one trait per file; file name = export name in kebab case (XY)
 src/systems/x-y.ts       one system per file
