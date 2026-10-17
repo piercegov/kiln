@@ -42,7 +42,7 @@ export function debugPlugin(options: DebugOptions = {}): Plugin {
 export const DebugPlugin = debugPlugin()
 
 class DebugUI {
-  private stats = { fps: 0, frame: 0, tick: 0, entities: 0, backend: '-' }
+  private stats = { fps: 0, ms: 0, frame: 0, tick: 0, entities: 0, backend: '-' }
   private systems: Record<string, number> = {}
   private resources = { json: '' }
   private inspect = { id: 1 }
@@ -58,7 +58,9 @@ class DebugUI {
     private host: HTMLElement,
   ) {
     const f = pane.addFolder({ title: 'Stats' })
-    f.addBinding(this.stats, 'fps', { readonly: true, view: 'graph', min: 0, max: 144 })
+    // Graph frame time, not fps: it stays readable from 30 Hz to uncapped 300+ fps displays.
+    f.addBinding(this.stats, 'ms', { readonly: true, view: 'graph', min: 0, max: 50, label: 'frame ms' })
+    f.addBinding(this.stats, 'ms', { readonly: true, label: 'frame ms', format: (v: number) => v.toFixed(2) })
     f.addBinding(this.stats, 'fps', { readonly: true, format: (v: number) => v.toFixed(0) })
     for (const k of ['frame', 'tick', 'entities'] as const) f.addBinding(this.stats, k, { readonly: true, format: (v: number) => v.toFixed(0) })
     f.addBinding(this.stats, 'backend', { readonly: true })
@@ -150,6 +152,7 @@ class DebugUI {
     const now = performance.now()
     const frames = app.time.frame - this.lastFrame
     this.stats.fps = (frames * 1000) / Math.max(1, now - this.lastTime)
+    this.stats.ms = frames > 0 ? Math.min(50, (now - this.lastTime) / frames) : 50
     this.lastFrame = app.time.frame
     this.lastTime = now
     this.stats.frame = app.time.frame
