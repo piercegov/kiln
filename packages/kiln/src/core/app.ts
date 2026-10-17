@@ -259,11 +259,15 @@ export class App {
     built: [] as Hook[],
     /** When the app is disposed. */
     dispose: [] as Hook[],
+    /** When a browser frame throws. The loop pauses; the browser runtime shows an overlay. */
+    error: [] as Hook<[unknown]>[],
   }
   /** True until start() runs in a browser. Render-only work skips itself when headless. */
   headless = true
   /** Record per-system timings (the debug plugin turns this on). */
   profile = false
+  /** While true the browser loop only renders; the simulation is frozen. */
+  paused = false
   canvas: HTMLCanvasElement | undefined
 
   private builders = new Map<Phase, PhaseBuilder>()
@@ -371,6 +375,25 @@ export class App {
   async ready(): Promise<this> {
     while (this.pending.size > 0) await Promise.all([...this.pending])
     if (this.pluginError) throw this.pluginError
+    return this
+  }
+
+  private background = new Set<Promise<unknown>>()
+
+  /**
+   * Registers background work (asset loads) that never blocks a phase. `app.idle()` waits for it;
+   * scenarios call it after Startup so headless runs stay deterministic.
+   */
+  track<T>(work: Promise<T>): Promise<T> {
+    const p = work.finally(() => this.background.delete(p))
+    this.background.add(p)
+    p.catch(() => {})
+    return work
+  }
+
+  /** Resolves when all tracked background work (e.g. asset loads) has settled. */
+  async idle(): Promise<this> {
+    while (this.background.size > 0) await Promise.allSettled([...this.background])
     return this
   }
 
@@ -634,7 +657,16 @@ export class App {
           this.bus.startRecording()
           const dt = (now - last) / 1000
           last = now
-          this.frame(dt, false)
+          try {
+            if (this.paused) {
+              if (!this.headless) this.render()
+            } else this.frame(dt, false)
+          } catch (err) {
+            // Stop on the first error instead of flooding the console every frame.
+            this.paused = true
+            for (const h of this.hooks.error) void h(err)
+            if (this.hooks.error.length === 0) console.error(err)
+          }
         }
         this.raf = requestAnimationFrame(loop)
       }

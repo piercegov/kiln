@@ -14,6 +14,7 @@ export interface LoadedGame {
 /** Finds kiln.config.ts and the entry module whose default export builds the app. */
 export async function loadGame(root: string, overrides: KilnConfig = {}): Promise<LoadedGame> {
   ;(globalThis as any).__KILN_OVERRIDES__ = Object.keys(overrides).length ? overrides : undefined
+  ;(globalThis as any).__KILN_ROOT__ = root
   let config: KilnConfig = {}
   for (const name of ['kiln.config.ts', 'kiln.config.js', 'kiln.config.mjs']) {
     const p = resolve(root, name)

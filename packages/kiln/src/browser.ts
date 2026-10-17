@@ -64,6 +64,7 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
   try {
     app = await main()
     globalThis.__kiln_app = app
+    app.hooks.error.push(showError)
     await app.start(canvas)
   } catch (err) {
     showError(err)
@@ -83,6 +84,7 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
         if (old && old !== value) current.replaceSystem(old, value)
       }
       clearError()
+      current.paused = false
       console.info('[kiln] hot-swapped systems; world kept')
     } catch (err) {
       showError(err)
@@ -104,6 +106,7 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
     }
     try {
       const next = await mod.default()
+      next.hooks.error.push(showError)
       current.dispose()
       globalThis.__kiln_app = next
       await next.start(canvas, { startup: false })

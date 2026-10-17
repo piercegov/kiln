@@ -91,7 +91,11 @@ export async function scenarioApp(options: ScenarioOptions = {}, root = findGame
   } finally {
     g.__KILN_OVERRIDES__ = prev
   }
-  if (options.startup !== false) app.boot()
+  if (options.startup !== false) {
+    app.boot()
+    // Assets requested during Startup finish before the body runs, so steps are deterministic.
+    await app.idle()
+  }
   return app
 }
 

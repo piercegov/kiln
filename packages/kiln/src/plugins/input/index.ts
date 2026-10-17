@@ -40,12 +40,15 @@ const DEADZONE = 0.15
 /** Raw device state, written by DOM listeners and gamepad polling. */
 export class RawInput {
   keys = new Set<string>()
+  /** Keys that went down since the last poll, so a press and release within one frame still counts. */
+  tapped = new Set<string>()
   /** Analog values for gamepad bindings ('Pad:A' → 1, 'Pad:LX+' → 0.7). */
   pad = new Map<string, number>()
   stick = { x: 0, y: 0, active: false }
   pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, inside: false }
   clear(): void {
     this.keys.clear()
+    this.tapped.clear()
     this.pad.clear()
   }
 }
@@ -215,7 +218,7 @@ class Controller implements InputController {
 }
 
 function bindingValue(b: Binding, raw: RawInput, ctl: Controller): number {
-  if (raw.keys.has(b) || ctl.virtualKeys.has(b)) return 1
+  if (raw.keys.has(b) || raw.tapped.has(b) || ctl.virtualKeys.has(b)) return 1
   return raw.pad.get(b) ?? 0
 }
 
@@ -250,6 +253,7 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
   if (typeof window === 'undefined') return () => {}
   const prevent = new Set(['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'])
   const onKeyDown = (e: KeyboardEvent) => {
+    if (!e.repeat) raw.tapped.add(e.code)
     raw.keys.add(e.code)
     if (prevent.has(e.code) && e.target === document.body) e.preventDefault()
   }
@@ -272,6 +276,7 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
   const onDown = (e: PointerEvent) => {
     pos(e)
     raw.keys.add(`Mouse${e.button}`)
+    raw.tapped.add(`Mouse${e.button}`)
   }
   const onUp = (e: PointerEvent) => raw.keys.delete(`Mouse${e.button}`)
   const onWheel = (e: WheelEvent) => {
@@ -383,6 +388,7 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
         rp.dx = 0
         rp.dy = 0
         rp.wheel = 0
+        raw.tapped.clear()
         ctl.observe(state)
       },
       { name: 'PollInput' },

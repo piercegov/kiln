@@ -39,3 +39,7 @@ export { RenderPlugin, renderPlugin, Scene, Camera, Renderer, MeshRef, SharedMes
 export type { RenderOptions, RendererState } from './plugins/render/index.ts'
 export { InputPlugin, inputPlugin, Input, InputState, ActionMap, DEFAULT_ACTIONS } from './plugins/input/index.ts'
 export type { ActionBindings, Binding, InputOptions } from './plugins/input/index.ts'
+export { AssetsPlugin, assetsPlugin, Assets, AssetStore, Model } from './plugins/assets/index.ts'
+export type { AssetHandle, AssetKind, AssetOptions, GLTF } from './plugins/assets/index.ts'
+export { DebugPlugin, debugPlugin } from './plugins/debug/index.ts'
+export type { DebugOptions } from './plugins/debug/index.ts'
