@@ -1,4 +1,4 @@
-import { $internal, type Trait } from 'koota'
+import { $internal, $relation, type Trait } from 'koota'
 
 /**
  * Kiln names things after their export: `export const Movement = system(...)` is "Movement".
@@ -7,12 +7,14 @@ import { $internal, type Trait } from 'koota'
  */
 const names = new WeakMap<object, string>()
 const traitsByName = new Map<string, Trait>()
+const objectsByName = new Map<string, object>()
 
 export function setName(obj: unknown, name: string, override = false): void {
   if (obj === null || (typeof obj !== 'object' && typeof obj !== 'function')) return
   if (!override && names.has(obj)) return
   names.set(obj, name)
-  if (isTrait(obj)) traitsByName.set(name, obj)
+  objectsByName.set(name, obj)
+  if (isTrait(obj) || (obj as any)[$relation] === true) traitsByName.set(name, obj as Trait)
 }
 
 export function nameOf(obj: unknown, fallback = 'anonymous'): string {
@@ -24,9 +26,14 @@ export function hasName(obj: object): boolean {
   return names.has(obj)
 }
 
-/** Looks up a named trait, for restoring snapshots. */
+/** Looks up a named trait or relation, for restoring snapshots. */
 export function traitByName(name: string): Trait | undefined {
   return traitsByName.get(name)
+}
+
+/** Looks up any named Kiln object (resource, event, prefab, system) by name. */
+export function objectByName(name: string): object | undefined {
+  return objectsByName.get(name)
 }
 
 export function namedTraits(): ReadonlyMap<string, Trait> {

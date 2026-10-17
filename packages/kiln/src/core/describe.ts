@@ -1,11 +1,11 @@
-import { $internal, type Trait } from 'koota'
+import { $internal, $relation, type Trait } from 'koota'
 import type { App } from './app.ts'
 import { namedTraits, traitName } from './names.ts'
 import { PHASES } from './schedule.ts'
 
 export interface TraitInfo {
   name: string
-  storage: 'soa' | 'aos' | 'tag'
+  storage: 'soa' | 'aos' | 'tag' | 'relation'
   /** Field names and defaults, for struct-of-arrays traits. */
   fields?: Record<string, unknown>
 }
@@ -37,6 +37,7 @@ export interface AppDescription {
 }
 
 export function traitInfo(t: Trait): TraitInfo {
+  if ((t as any)[$relation]) return { name: traitName(t), storage: 'relation' }
   const storage = t[$internal].type as TraitInfo['storage']
   const info: TraitInfo = { name: traitName(t), storage }
   if (storage === 'soa') {

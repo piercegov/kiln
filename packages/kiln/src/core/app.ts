@@ -12,12 +12,14 @@ import { CommandQueue, Commands } from './commands.ts'
 import { defaultDev } from './dev.ts'
 import { KilnError } from './errors.ts'
 import { Events, EventBus, isEvent, type EventType } from './event.ts'
+import type { InputController } from './input-types.ts'
 import { describeApp, type AppDescription } from './describe.ts'
 import { guard, installEntityGuards, readonlyWorld, type GuardTarget } from './guard.ts'
 import { nameOf } from './names.ts'
 import { isPlugin, type Plugin, type PluginLike } from './plugin.ts'
 import { resolveSpawn, type Prefab } from './prefab.ts'
 import { isResource, type Resource } from './resource.ts'
+import { diffSnapshots, restoreSnapshot, takeSnapshot, type Snapshot, type SnapshotDiff, type SnapshotOptions } from './snapshot.ts'
 import { accessOf, NamedQueryView, RowPlan, type Access } from './runtime.ts'
 import {
   buildPhase,
@@ -249,6 +251,8 @@ export class App {
     start: [] as Hook<[HTMLCanvasElement | undefined]>[],
     /** Before each fixed step (render uses it to snapshot the previous transform). */
     fixedStart: [] as Hook[],
+    /** After each fixed step and its commands. */
+    fixedEnd: [] as Hook[],
     /** At the start of each frame, with its delta. */
     frameStart: [] as Hook<[number]>[],
     /** After the schedule is (re)built. */
@@ -545,6 +549,7 @@ export class App {
       t.tick++
       t.elapsed = t.tick * step
       ran++
+      for (const h of this.hooks.fixedEnd) void h()
     }
     if (exactStep) {
       runFixed()
@@ -711,9 +716,37 @@ export class App {
     return this.bus.recorded(e)
   }
 
+  /**
+   * The world as JSON: `app.snapshot({ traits: [Transform, Health] })`. With no traits, every
+   * JSON-friendly trait on every entity. Add `resources: [Score]` or `resources: true`.
+   */
+  snapshot(options?: SnapshotOptions): Snapshot {
+    return takeSnapshot(this, options)
+  }
+
+  /** Field-level changes between two snapshots. Numbers within epsilon count as equal. */
+  diff(a: Snapshot, b: Snapshot, epsilon = 0): SnapshotDiff {
+    return diffSnapshots(a, b, epsilon)
+  }
+
+  /** Replaces all entities (and listed resources) with a snapshot's. Traits match by name. */
+  restore(snapshot: Snapshot): { missingTraits: string[] } {
+    this.assertOutsideSystem('restore')
+    return restoreSnapshot(this, snapshot)
+  }
+
   /** The built app as data: phases, systems with reads/writes/order, traits, resources, events. */
   describe(): AppDescription {
     return describeApp(this)
+  }
+
+  /** Scripted and live input: `app.input.script([{ frame: 10, press: 'jump' }])`. Needs the input plugin. */
+  get input(): InputController {
+    const c = this.ext.input as InputController | undefined
+    if (!c) {
+      throw new KilnError('no-input-plugin', 'app.input needs the input plugin. Add .use(CorePlugins) (or InputPlugin from kiln/input).')
+    }
+    return c
   }
 
   /** Resource access with the same read-only rules systems get. */

@@ -120,7 +120,7 @@ describe('describe', () => {
     expect(fixed.systems[0]!.writes).toEqual(['Transform'])
     expect(fixed.systems[0]!.reads).toEqual(['Velocity'])
     expect(fixed.systems[1]!.after).toEqual(['Movement'])
-    expect(d.plugins).toEqual(['CorePlugin'])
+    expect(d.plugins).toEqual(['CorePlugin', 'InputPlugin'])
   })
 
   test('kiln describe --json on a fixture game', async () => {
