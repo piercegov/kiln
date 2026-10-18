@@ -122,6 +122,8 @@ export default async function shot(args: Args, root: string): Promise<number> {
   try {
     const page = await browser.newPage({ viewport: { width, height } })
     page.on('console', (m) => {
+      // Full Chrome (not Playwright's headless shell) asks for /favicon.ico; a game without one isn't an error.
+      if (m.location().url.endsWith('/favicon.ico')) return
       if (m.type() === 'error') errors.push(m.text())
       else if (m.type() === 'warning') warnings.push(m.text())
     })

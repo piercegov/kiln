@@ -11,6 +11,9 @@ import { Terrain, terrainHeightAt, TerrainPlugin } from '../community/terrain/in
 import { ParticleEmitter, ParticlesPlugin } from '../community/particles/index.ts'
 import { AudioPlugin, AudioState, PlaySound, Sound } from '../community/audio/index.ts'
 
+// CI runners have no GPU, and WebGPU on them logs device errors; WebGL2 (SwiftShader) renders cleanly.
+const gpu = process.env.CI ? ['--webgl'] : []
+
 const apps: App[] = []
 afterEach(() => {
   for (const a of apps.splice(0)) a.dispose()
@@ -118,7 +121,7 @@ describe('community fixture', () => {
       const dir = mkdtempSync(join(tmpdir(), 'kiln-community-'))
       const out = join(dir, 'shot.png')
       try {
-        const r = await $`bun src/cli/kiln.ts shot --json --steps 60 --cwd test/fixtures/community ${out}`.cwd(`${import.meta.dir}/..`).nothrow().quiet()
+        const r = await $`bun src/cli/kiln.ts shot --json ${gpu} --steps 60 --cwd test/fixtures/community ${out}`.cwd(`${import.meta.dir}/..`).nothrow().quiet()
         const res = JSON.parse(r.stdout.toString().trim().split('\n').pop()!)
         expect(res.ok).toBe(true)
         expect(res.tick).toBe(60)

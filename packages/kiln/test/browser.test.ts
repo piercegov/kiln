@@ -7,6 +7,9 @@ import { shotPlan } from '../src/cli/shot.ts'
 import { parseArgs } from '../src/cli/args.ts'
 import { addNames } from '../src/tooling/names.ts'
 
+// CI runners have no GPU, and WebGPU on them logs device errors; WebGL2 (SwiftShader) renders cleanly.
+const gpu = process.env.CI ? ['--webgl'] : []
+
 describe('vite plugin', () => {
   test('factoryKinds tells system-only modules apart', () => {
     expect(factoryKinds('export const A = system(() => {})\nexport const B = system([X], f)')).toEqual(['system', 'system'])
@@ -89,7 +92,7 @@ describe('kiln shot', () => {
       const out = `${import.meta.dir}/../.shot-setup-test.png`
       rmSync(out, { force: true })
       const input = '[{"frame":1,"tap":"jump"}]'
-      const r = await $`bun src/cli/kiln.ts shot --json --steps 30 --setup shots/advance.ts --input ${input} --cwd test/fixtures/scene ${out}`
+      const r = await $`bun src/cli/kiln.ts shot --json ${gpu} --steps 30 --setup shots/advance.ts --input ${input} --cwd test/fixtures/scene ${out}`
         .cwd(`${import.meta.dir}/..`)
         .nothrow()
         .quiet()

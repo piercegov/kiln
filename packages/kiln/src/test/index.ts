@@ -109,10 +109,14 @@ export async function scenarioApp(options: ScenarioOptions = {}, root = findGame
 
 type Body = (ctx: ScenarioContext) => void | Promise<void>
 
-function make(runner: typeof test | typeof test.only | typeof test.skip) {
+// Runners are passed as getters: under CI, bun throws as soon as test.only is touched, so it's read
+// only when scenario.only / replay.only is actually called.
+type Runner = () => typeof test | typeof test.only | typeof test.skip
+
+function make(runner: Runner) {
   return (name: string, fn: Body, options: ScenarioOptions = {}) => {
     const root = findGameRoot(callerFile())
-    return runner(
+    return runner()(
       name,
       async () => {
         const app = await scenarioApp(options, root)
@@ -128,7 +132,7 @@ function make(runner: typeof test | typeof test.only | typeof test.skip) {
 }
 
 /** A headless test: fresh app, Startup run, disposed after. */
-export const scenario = Object.assign(make(test), { only: make(test.only), skip: make(test.skip) })
+export const scenario = Object.assign(make(() => test), { only: make(() => test.only), skip: make(() => test.skip) })
 
 export interface ReplayOptions extends Omit<ScenarioOptions, 'seed' | 'startup'> {
   /** Stop after this frame instead of playing the whole recording. */
@@ -181,10 +185,10 @@ export async function replayApp(
 
 type ReplayBody = (ctx: ReplayContext) => void | Promise<void>
 
-function makeReplay(runner: typeof test | typeof test.only | typeof test.skip) {
+function makeReplay(runner: Runner) {
   return (name: string, recording: Recording | string, fn: ReplayBody = () => {}, options: ReplayOptions = {}) => {
     const root = findGameRoot(callerFile())
-    return runner(
+    return runner()(
       name,
       async () => {
         const ctx = await replayApp(recording, options, root)
@@ -203,4 +207,4 @@ function makeReplay(runner: typeof test | typeof test.only | typeof test.skip) {
  * A test that replays a recorded session on a fresh app, then runs the body. If the session ended
  * in an error, the replay throws it at the same frame, so the test fails until the bug is fixed.
  */
-export const replay = Object.assign(makeReplay(test), { only: makeReplay(test.only), skip: makeReplay(test.skip) })
+export const replay = Object.assign(makeReplay(() => test), { only: makeReplay(() => test.only), skip: makeReplay(() => test.skip) })
