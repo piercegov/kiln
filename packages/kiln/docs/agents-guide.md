@@ -51,12 +51,15 @@ import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, 
   prefab, plugin, state, inState, onEnter, onExit, despawnOnExit, createApp, CorePlugins, Startup,
   InputPhase, Fixed, Update, Late, Render, Transform, ChildOf, Rng, Input, Camera, Scene, MeshRef,
   SharedMesh, Instanced, defineInstanced, Assets, Model, Timer, Lifetime, Delayed, Tweens, Ui, UiClick,
-  CameraPlugin, CameraTarget, CameraShake, CameraRig, savePlugin, Saves,
+  CameraPlugin, CameraTarget, CameraShake, CameraRig, savePlugin, Saves, animationGraph,
+  SpriteAnimationPlugin, spriteSheet, spriteAnimator, SpriteAnimator, AnimateSprites,
+  SkeletalAnimationPlugin, animator, Animator, AnimateModels, AnimationEvent,
   setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
 ```
 
 `CorePlugins` = core (Time, Rng), render, input, assets, timers, tweens, HUD/UI, debug. Add
-`CameraPlugin`, `savePlugin({...})` and `PhysicsPlugin` (from `'kiln/physics'`) when you need them.
+`CameraPlugin`, `savePlugin({...})`, `SpriteAnimationPlugin`, `SkeletalAnimationPlugin` and
+`PhysicsPlugin` (from `'kiln/physics'`) when you need them.
 
 | Helper | Use |
 |---|---|
@@ -270,6 +273,64 @@ res.get(Saves).has('slot1'), .slots(), .delete('slot1')
 - `persist` resources load before Startup and save themselves whenever they change (localStorage in
   the browser, memory headless). Tests pass `storage: memoryStorage()` to share one store between apps.
 
+## Animation (`SpriteAnimationPlugin`, `SkeletalAnimationPlugin`)
+
+Both plugins share one API: an animation graph as data, an animator component per entity, and events.
+
+```ts
+// src/data.ts
+/** The hero's frames: 4x4 grid, frames numbered left to right, top to bottom. */
+export const HeroSheet = spriteSheet({ texture: 'sprites/hero.png', columns: 4, rows: 4, size: [2, 2], pivot: [0.5, 0],
+  clips: { idle: { range: [0, 3], fps: 4 }, run: { range: [4, 7], fps: 10 }, attack: { range: [8, 11], fps: 14, loop: 'once' } } })
+/** States, transitions and events of the hero's animation. */
+export const HeroAnim = animationGraph({
+  initial: 'idle',
+  params: { speed: 0 },                       // numbers or booleans, with defaults
+  triggers: ['attack'],
+  fade: 0.15,                                 // default crossfade seconds (3D; sprites switch at once)
+  states: {
+    idle: {},                                 // plays the clip with the state's name; or { clip: 'Idle_Loop' }
+    run: { events: [{ frame: 0, name: 'footstep' }, { frame: 2, name: 'footstep' }] },   // glTF: { at: 0.4, name }
+    attack: { loop: 'once', events: [{ frame: 2, name: 'hitFrame' }] },
+  },
+  transitions: [                              // checked in order each step; the first that holds fires
+    { from: ['idle', 'run'], to: 'attack', trigger: 'attack' },
+    { from: 'attack', to: 'idle', exitTime: 1 },                   // when the clip has played once
+    { from: 'idle', to: 'run', when: { speed: { gt: 0.1 } } },     // gt gte lt lte eq ne, or a value
+    { from: 'run', to: 'idle', when: { speed: { lte: 0.1 } } },
+  ],
+})
+// 2D: app.use(CorePlugins, SpriteAnimationPlugin); the entity gets its quad (MeshRef) automatically
+commands.spawn(Transform, spriteAnimator(HeroSheet, { graph: HeroAnim }))
+// 3D: app.use(CorePlugins, SkeletalAnimationPlugin); clips come from the Model's glTF
+commands.spawn(Transform, Model(assets.gltf('models/hero.glb')), animator({ graph: HeroAnim }))
+// gameplay sets params and triggers; in Fixed, order it before the animation step
+export const HeroControl = system([Mut(SpriteAnimator), Velocity, IsHero], ([anim, v], { res }) => {
+  anim.set('speed', Math.abs(v.x))
+  if (res.get(Input).pressed('fire')) anim.trigger('attack')
+  anim.flipX = v.x < 0                        // sprites only
+})
+//   .add(Fixed, HeroControl.before(AnimateSprites))      (3D: .before(AnimateModels))
+// react to events anywhere (each reader sees each once)
+for (const ev of events.read(AnimationEvent)) if (ev.name === 'hitFrame') { /* ev.entity, ev.state */ }
+```
+
+- Rows (`Mut(SpriteAnimator)` / `Mut(Animator)`) have `set(param, v)`, `trigger(name)`, `play(state, {
+  fade, restart })`, `speed`, `paused`, and read `state`, `is(s)`, `get(param)`, `time`,
+  `normalizedTime` (plays so far), `finished`, `weight` (crossfade). Sprites add `frame`, `clipFrame`,
+  `flipX`; 3D adds `mixer`, `action(clip)`. No graph: one state per clip, switched with `play('run')`.
+- Clips: `range: [first, last]` or `frames: [...]`, `fps` (10), `loop: 'loop' | 'once' | 'pingpong'`.
+  Atlas sheets: `atlas: { width, height, frames: [{ x, y, w, h }] }` in pixels. `pivot` [0.5, 0] puts
+  the Transform at the feet; `filter: 'linear'` for non-pixel art.
+- Triggers last one animation step unless a transition takes them. `'*'` as `from` means any state but
+  `to`. play() applies at the next step and skips transitions.
+- Events: `AnimationEvent { entity, name, state }` when a frame first shows (or a time is reached),
+  every loop; `AnimationStateChanged { entity, from, to }`; `AnimationFinished { entity, state }` when
+  a `once` clip ends. Emitted in Fixed, so gameplay reacting to `hitFrame` in Fixed is deterministic.
+- Animation ticks in Fixed (`AnimateSprites`, `AnimateModels`). 3D poses are sampled at the fixed rate;
+  each entity has its own AnimationMixer, stopped and uncached on despawn. Animators show in
+  `kiln run --snapshot SpriteAnimator` but aren't saved: re-add them on `Loaded`.
+
 ## Physics (`kiln/physics`, Rapier)
 
 ```ts
@@ -395,4 +456,7 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 | `'x' is not a value of this state` | use one of the listed values, or add it to `state([...])` |
 | `Saves needs the save plugin` | `.use(savePlugin({ resources, traits, persist }))` |
 | `Ui.click('x'): there is no button 'x'` | the button isn't set yet (step first) or the id differs |
+| `AnimateSprites and X both take Mut(SpriteAnimator)` | `X.before(AnimateSprites)` (3D: `.before(AnimateModels)`) |
+| `No animation param 'x'` / `trigger` / `state` | declare it in the graph's `params` / `triggers` / `states` |
+| `Animation state 's' plays clip 'c', which ... doesn't have` | set the state's `clip` to one of the listed clips |
 

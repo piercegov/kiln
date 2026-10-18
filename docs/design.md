@@ -10,7 +10,7 @@ This page records how the implementation maps to it, and where it deliberately d
 | Layer | Where | Imports Three.js? |
 |---|---|---|
 | Core: app, loop, ECS wrap, schedule, events, snapshots | `packages/kiln/src/core` | No (enforced by a test) |
-| Plugins: render, input, assets, debug, physics, timer, tween, ui, camera, save | `packages/kiln/src/plugins` | render/assets/debug/camera yes; the rest no |
+| Plugins: render, input, assets, debug, physics, timer, tween, ui, camera, save, animation | `packages/kiln/src/plugins` | render/assets/debug/camera/animation yes (except the animation graph); the rest no |
 | Tooling: CLI, Vite plugin, Bun preload, scenario runner | `packages/kiln/src/{cli,tooling,test}` | — |
 | Community plugins (`kiln add`) | `packages/kiln/community` | yes |
 
@@ -47,3 +47,11 @@ This page records how the implementation maps to it, and where it deliberately d
   stay deterministic. The UI is retained data in a resource (assertable headless), drawn as DOM over
   the canvas; `kiln shot` clips the page so the HUD is in the image. Save files hold the chosen
   resources and trait values only; Three.js objects are rebuilt by the game after `Loaded`.
+- **Animation**: sprite and skeletal animation share one graph (`plugins/animation/graph.ts`, no
+  Three.js): states play clips, transitions test params, triggers and exit times, events sit on states.
+  It ticks in Fixed like timers and tweens, so a `hitFrame` event can drive gameplay deterministically.
+  The graph computes crossfade weights and playheads itself; the skeletal plugin writes them into each
+  mixer action and samples with `mixer.update(0)`, instead of Three's own fades, so the weights are
+  testable headless and match the graph exactly. Sprite quads own their geometry (UVs per frame) and
+  share one material per sheet. Both are opt-in plugins; animators are AoS objects with `toJSON` for
+  snapshots and are not part of saves.
