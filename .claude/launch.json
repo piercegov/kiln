@@ -53,6 +53,17 @@
         "--strictPort"
       ],
       "port": 5196
+    },
+    {
+      "name": "docs",
+      "runtimeExecutable": "docs/node_modules/.bin/vitepress",
+      "runtimeArgs": [
+        "preview",
+        "docs",
+        "--port",
+        "5195"
+      ],
+      "port": 5195
     }
   ]
 }

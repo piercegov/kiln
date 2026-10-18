@@ -33,7 +33,8 @@ kiln docs         # AGENTS.md from the code and its JSDoc
 - `packages/kiln`: the framework (`kiln`, `kiln/physics`, `kiln/test`, `kiln/vite`, `kiln/browser`), the CLI,
   community plugins for `kiln add`, and the `kiln new` template.
 - `examples/coin-collector`: the sample game, with `eval/` tasks for measuring agents.
-- `docs/design.md`: how the build maps to the design doc.
+- `docs/`: the documentation site (VitePress guides plus a TypeDoc API reference); `cd docs && bun install && bun run dev`.
+  `docs/design.md` is how the build maps to the design doc.
 
 ## Develop
 

@@ -1,0 +1,44 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "../packages/kiln/src/index.ts",
+    "../packages/kiln/src/plugins/physics/index.ts",
+    "../packages/kiln/src/test/index.ts",
+    "../packages/kiln/src/tooling/vite.ts",
+    "../packages/kiln/src/browser.ts"
+  ],
+  "tsconfig": "../tsconfig.json",
+  "out": "api",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "typedoc-vitepress-theme",
+    "./typedoc-plugin-kiln.mjs"
+  ],
+  "docsRoot": ".",
+  "readme": "none",
+  "hidePageHeader": true,
+  "excludePrivate": true,
+  "excludeInternal": true,
+  "excludeExternals": true,
+  "sort": [
+    "source-order"
+  ],
+  "useCodeBlocks": true,
+  "parametersFormat": "table",
+  "interfacePropertiesFormat": "table",
+  "skipErrorChecking": true,
+  "sidebar": {
+    "pretty": true
+  },
+  "name": "Kiln API",
+  "disableSources": true,
+  "validation": {
+    "notExported": false
+  },
+  "entryFileName": "index",
+  "sanitizeComments": true,
+  "navigation": {
+    "includeFolders": false
+  },
+  "sortEntryPoints": false
+}
