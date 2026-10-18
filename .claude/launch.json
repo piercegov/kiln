@@ -40,6 +40,19 @@
         "--strictPort"
       ],
       "port": 5197
+    },
+    {
+      "name": "sprite-hero",
+      "runtimeExecutable": "bunx",
+      "runtimeArgs": [
+        "--bun",
+        "vite",
+        "examples/sprite-hero",
+        "--port",
+        "5196",
+        "--strictPort"
+      ],
+      "port": 5196
     }
   ]
 }
