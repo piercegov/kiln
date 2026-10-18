@@ -54,3 +54,5 @@ export { CameraPlugin, CameraRig, CameraRigState, CameraTarget, CameraShake, Cam
 export type { CameraBounds } from './plugins/camera/index.ts'
 export { savePlugin, Saves, SaveSlots, Saved, Loaded, memoryStorage, localStorageStorage } from './plugins/save/index.ts'
 export type { SaveOptions, SaveStorage } from './plugins/save/index.ts'
+export { animationGraph, AnimationController, AnimationEvent, AnimationStateChanged, AnimationFinished } from './plugins/animation/index.ts'
+export type { AnimationGraph, AnimationGraphSpec, AnimationStateSpec, AnimationEventSpec, TransitionSpec, ParamTest, LoopMode } from './plugins/animation/index.ts'
