@@ -31,7 +31,7 @@ jobs:
       # api/ is gitignored; `bun run build` regenerates it with TypeDoc first.
       - run: bun run build
         working-directory: docs
-      # Publishes to https://kiln-docs.pages.dev (Cloudflare Pages, free plan).
+      # Publishes to https://kiln-docs-8zp.pages.dev (Cloudflare Pages, free plan).
       # Needs repo secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
       - uses: cloudflare/wrangler-action@v3
         with:
