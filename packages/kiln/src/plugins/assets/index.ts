@@ -5,6 +5,7 @@ import type { App } from '../../core/app.ts'
 import { KilnError } from '../../core/errors.ts'
 import { trait } from '../../core/koota.ts'
 import { plugin } from '../../core/plugin.ts'
+import { isReplaying, noteChannel, replayChannel, type Replayer } from '../../core/recording.ts'
 import { resource } from '../../core/resource.ts'
 import { Update } from '../../core/schedule.ts'
 import { system } from '../../core/system.ts'
@@ -94,6 +95,8 @@ export interface AssetOptions {
  */
 export class AssetStore {
   private cache = new Map<string, AssetHandle<any>>()
+  /** Replays: finished loads waiting for the frame the recording says they finished on. */
+  private held = new Map<string, () => void>()
   private gltfLoader: Promise<any> | null = null
 
   constructor(
@@ -130,19 +133,29 @@ export class AssetStore {
     promise.catch(() => {})
     const handle: AssetHandle<T> = { path, kind, ready: false, failed: false, error: null, value: null, promise }
     this.cache.set(path, handle)
+    // Live, a load lands between frames and a recording notes when. A replay holds it until then.
+    const settle = (finish: () => void) => {
+      if (isReplaying(this.app)) this.held.set(path, finish)
+      else {
+        finish()
+        noteChannel(this.app, 'asset', path)
+      }
+    }
     this.app.track(
       this.fetchAs<T>(path, kind).then(
-        (v) => {
-          handle.value = v
-          handle.ready = true
-          resolveP(v)
-        },
-        (err) => {
-          handle.failed = true
-          handle.error = err instanceof Error ? err.message : String(err)
-          console.error(`[kiln] ${handle.error}`)
-          rejectP(err)
-        },
+        (v) =>
+          settle(() => {
+            handle.value = v
+            handle.ready = true
+            resolveP(v)
+          }),
+        (err) =>
+          settle(() => {
+            handle.failed = true
+            handle.error = err instanceof Error ? err.message : String(err)
+            console.error(`[kiln] ${handle.error}`)
+            rejectP(err)
+          }),
       ),
     )
     return handle
@@ -156,6 +169,16 @@ export class AssetStore {
   }
   json<T = unknown>(path: string): AssetHandle<T> {
     return this.load<T>(path, 'json')
+  }
+
+  /** Replays: finishes a held load (waiting for it if needed). False if the game never requested it. */
+  async release(path: string): Promise<boolean> {
+    if (!this.cache.has(path)) return false
+    if (!this.held.has(path)) await this.app.idle()
+    const finish = this.held.get(path)
+    this.held.delete(path)
+    finish?.()
+    return true
   }
 
   /** The handle for a path if it was requested. */
@@ -259,6 +282,11 @@ export function assetsPlugin(options: AssetOptions = {}) {
   return plugin((app) => {
     app.ext.assetOptions = options
     app.init(Assets)
+    replayChannel(app, 'asset', async (path) => {
+      if (!(await app.resource(Assets).release(path as string))) {
+        (app.ext.replay as Replayer | undefined)?.warnOnce(`the recording loaded '${path}' but the replay never requested it by then (the game has diverged).`)
+      }
+    })
     /** Gives entities with a ready Model their MeshRef instance. */
     const SpawnModels = system(
       { pending: [Model, Not(MeshRef)] },

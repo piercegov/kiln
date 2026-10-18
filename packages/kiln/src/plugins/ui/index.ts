@@ -2,6 +2,7 @@ import type { App } from '../../core/app.ts'
 import { KilnError } from '../../core/errors.ts'
 import { event } from '../../core/event.ts'
 import { plugin } from '../../core/plugin.ts'
+import { noteChannel, replayChannel } from '../../core/recording.ts'
 import { resource } from '../../core/resource.ts'
 import { InputPhase, Render } from '../../core/schedule.ts'
 import { system } from '../../core/system.ts'
@@ -333,8 +334,13 @@ export const UiPlugin = plugin((app: App) => {
   app.add(Render, RenderUi)
   app.hooks.start.push((canvas) => {
     if (typeof document === 'undefined') return
-    dom = new UiDom(canvas, (id) => app.resource(Ui).clicks.push(id))
+    dom = new UiDom(canvas, (id) => {
+      app.resource(Ui).clicks.push(id)
+      noteChannel(app, 'ui-click', id)
+    })
   })
+  // DOM clicks arrive between frames, outside the input plugin; recordings carry them separately.
+  replayChannel(app, 'ui-click', (id) => void app.resource(Ui).clicks.push(id as string))
   app.hooks.dispose.push(() => {
     dom?.dispose()
     dom = null

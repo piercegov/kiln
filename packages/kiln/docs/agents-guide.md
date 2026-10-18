@@ -10,6 +10,7 @@ its JSDoc. Re-run `kiln docs` after changing exports or the schedule.
 ```bash
 kiln describe            # traits, systems in run order (reads/writes/after), resources, events
 kiln test                # bun test over scenarios/ (headless, deterministic)
+kiln replay recordings/x.json        # replay a play session the user recorded (F8 in the game)
 kiln run --steps 600 --snapshot Transform,Health --resources Score   # JSON world after N steps
 kiln check               # determinism lint (Math.random, Date.now, performance.now)
 kiln shot --steps 120 out.png        # one rendered frame from headless Chromium, when you need eyes
@@ -375,6 +376,48 @@ App methods for tests and tools: `step(n)`, `spawn(...)`, `despawn(e)`, `get(e, 
 `has(e, T)`, `query(...)`, `res(R)` (mutable), `emit(E, data)`, `events(E)`, `snapshot({ traits,
 resources, precision })`, `diff(a, b)`, `restore(snap)`, `describe()`. `scenarioApp(options)` builds an
 app yourself (dispose it after).
+
+## Reproducing a bug from a play session (recordings)
+
+In dev, every browser session records from boot. **F8** saves it to `recordings/<name>.json` in the
+game folder (a crash saves `recordings/crash-....json` on its own; `__kiln_save_recording(name)` does
+it from the console or Playwright). A recording holds the seed and loop config, every frame's delta,
+what the game saw from input (action values, stick axis, pointer), DOM HUD clicks, the frame each
+asset load finished on, the stored saves the session started with, and a state hash every 60 frames.
+When a user says "I recorded it", replay it before reading code:
+
+```bash
+kiln replay recordings/x.json --snapshot IsPlayer,Transform --resources Score   # end state + summary
+kiln replay recordings/x.json --until 300 --events Hit                      # stop where it went wrong
+kiln replay recordings/x.json --every 60 --snapshot Health                  # one JSON line per 60 frames
+```
+
+The summary says how many frames played, `divergedAt` (the first checkpoint whose state differs from
+the session, or null), `endMatches`, and `threw`/`reproduced` when the session crashed. `divergedAt:
+null` on unchanged code means the headless replay is the session; investigate it with `--until`. Then
+keep it as a regression test that fails until the fix lands:
+
+```ts
+import { expect, replay } from 'kiln/test'
+
+replay('coin pickup no longer double-counts', 'recordings/double-coin.json', ({ app, result }) => {
+  expect(app.res(Score).value).toBe(3)      // the app is live after the last frame: step it, query it
+})                                           // a recorded crash re-throws at the same frame
+```
+
+After a fix, `divergedAt` is expected (the fixed code produces different state); input still replays
+frame for frame, so assert on the outcome, not on matching the old session. `replayApp(rec, { until })`
+returns `{ app, result, replayer }` to play in pieces (`await replayer.play(900)`).
+
+What can make a replay drift from the browser (it shows as an early `divergedAt` on unchanged code):
+reading anything outside `ctx.time`, `Rng` and the input plugin (`Math.random`, `Date.now`, DOM
+state; `kiln check` flags these), hot reloads during the session (a system swap is listed in the
+recording's notes; the replay runs today's code throughout), and **physics**: Rapier runs the same
+WASM in the browser and under Bun, which usually matches, but cross-machine determinism is not
+guaranteed (see design decisions), and `Math.sin`/`cos`/`pow` can differ in the last bit between
+Chrome's V8 and Bun's JavaScriptCore, so long physics-heavy replays can drift. Read frames before
+`divergedAt` as exact and frames after it as approximate. Plugins with outside input of their own use
+`noteChannel(app, kind, data)` / `replayChannel(app, kind, apply)` and `recordStartState(...)`.
 
 ## A complete feature
 

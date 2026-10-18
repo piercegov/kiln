@@ -4,6 +4,7 @@
  *   kiln describe            traits, systems (phase, reads, writes, order), plugins
  *   kiln run --steps 600     JSON snapshot after N headless steps
  *   kiln test                bun test over scenarios/
+ *   kiln replay rec.json     replay a recorded play session headless
  *   kiln check               determinism lint (Math.random, Date.now in systems)
  *   kiln shot out.png        one rendered frame from headless Chromium
  *   kiln add <plugin>        copy a community plugin into src/plugins/
@@ -21,6 +22,9 @@ commands
   run --steps N [--seed S] [--snapshot Trait,..] [--resources Res,..] [--json]
                                      headless run, prints a snapshot
   test [bun test args]               scenario tests (bun test scenarios/)
+  replay <recording.json> [--until N] [--every N] [--snapshot Trait,..] [--events E,..]
+                                     replay a recorded session (F8 in the dev server) headless;
+                                     prints where it stopped matching and the end snapshot
   check [--json]                     determinism lint for src/
   shot [--steps N] [--seed S] [--width W] [--height H] out.png
                                      one rendered frame from headless Chromium
@@ -38,6 +42,7 @@ const commands: Record<string, () => Promise<{ default: Command }>> = {
   describe: () => import('./describe.ts'),
   run: () => import('./run.ts'),
   test: () => import('./test.ts'),
+  replay: () => import('./replay.ts'),
   check: () => import('./check.ts'),
   shot: () => import('./shot.ts'),
   add: () => import('./add.ts'),

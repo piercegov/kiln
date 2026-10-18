@@ -55,3 +55,14 @@ This page records how the implementation maps to it, and where it deliberately d
   testable headless and match the graph exactly. Sprite quads own their geometry (UVs per frame) and
   share one material per sheet. Both are opt-in plugins; animators are AoS objects with `toJSON` for
   snapshots and are not part of saves.
+- **Recordings** (`core/recording.ts`): a session is the seed and loop config plus everything that
+  reaches the simulation from outside, so a replay needs no world snapshot: per-frame deltas (replayed
+  with `tick(dt)`, so the fixed-step accumulator splits frames exactly as it did live), input as the
+  game saw it (action values, not keys, so devices and bindings don't matter), and side channels
+  plugins note between frames (DOM HUD clicks; asset loads, which a replay holds back to the recorded
+  frame; stored saves at start). Dev browser sessions record from boot; F8 or a crash POSTs to the
+  Vite plugin, which writes `recordings/`. A state hash (entities and Rng, rounded) every 60 frames
+  locates drift. Physics is not made deterministic here: Rapier drift, and `Math.*` differences
+  between V8 and JavaScriptCore, show up as an early `divergedAt` rather than being prevented.
+  Snapshots skip Three.js objects even though they have `toJSON`, so browser and headless states
+  compare.

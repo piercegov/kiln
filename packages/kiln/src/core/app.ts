@@ -59,6 +59,8 @@ export interface KilnConfig {
   maxFps?: number
   /** Most fixed steps per frame. Default 5. */
   maxFixedSteps?: number
+  /** Record every browser session in dev so F8 (or a crash) saves a replayable recording. Default true. */
+  record?: boolean
   /** Module whose default export builds the app, for the CLI and scenarios. Default 'src/main.ts'. */
   entry?: string
 }
@@ -81,6 +83,7 @@ function resolveConfig(c: KilnConfig): ResolvedConfig {
     maxFixedSteps: c.maxFixedSteps ?? 5,
     vsync: c.vsync ?? true,
     maxFps: c.maxFps ?? 0,
+    record: c.record ?? true,
     entry: c.entry ?? 'src/main.ts',
   }
 }
@@ -263,8 +266,10 @@ export class App {
     fixedStart: [] as Hook[],
     /** After each fixed step and its commands. */
     fixedEnd: [] as Hook[],
-    /** At the start of each frame, with its delta. */
-    frameStart: [] as Hook<[number]>[],
+    /** At the start of each frame, with its delta and whether it runs exactly one fixed step (step()). */
+    frameStart: [] as Hook<[number, boolean]>[],
+    /** After a frame's Update and Late phases, before Render. Recordings take their checkpoints here. */
+    frameEnd: [] as Hook[],
     /** After the schedule is (re)built. */
     built: [] as Hook[],
     /** When the app is disposed. */
@@ -637,11 +642,14 @@ export class App {
     return this
   }
 
-  /** Runs one variable-dt frame: input, 0..N fixed steps, update, late, render. */
-  tick(dt: number): this {
+  /**
+   * Runs one variable-dt frame: input, 0..N fixed steps, update, late, render. With `exact`, the
+   * frame runs exactly one fixed step as step() does (replays use it for frames stepped that way).
+   */
+  tick(dt: number, exact = false): this {
     this.assertReady('tick')
     this.boot()
-    this.frame(dt, false)
+    this.frame(exact ? this.time.step : dt, exact)
     return this
   }
 
@@ -650,7 +658,7 @@ export class App {
     const t = this.time
     const dt = Math.min(Math.max(rawDt, 0), this.config.maxFrameDt)
     t.frame++
-    for (const h of this.hooks.frameStart) void h(dt)
+    for (const h of this.hooks.frameStart) void h(dt, exactStep)
     t.dt = dt
     this.runPhase(InputPhase)
 
@@ -682,6 +690,7 @@ export class App {
     t.dt = dt
     this.runPhase(Update)
     this.runPhase(Late)
+    for (const h of this.hooks.frameEnd) void h()
     if (!this.headless) this.runPhase(Render)
   }
 

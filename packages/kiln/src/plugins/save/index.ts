@@ -4,6 +4,7 @@ import { KilnError } from '../../core/errors.ts'
 import { event } from '../../core/event.ts'
 import { traitName } from '../../core/names.ts'
 import { plugin, type Plugin } from '../../core/plugin.ts'
+import { recordStartState } from '../../core/recording.ts'
 import { resource, type Resource } from '../../core/resource.ts'
 import { takeSnapshot, type EntitySnapshot } from '../../core/snapshot.ts'
 
@@ -209,19 +210,36 @@ export function savePlugin(options: SaveOptions = {}): Plugin {
     for (const r of options.resources ?? []) app.init(r)
 
     // Persisted resources: load now (before Startup), save when their JSON changes.
+    const loadPersisted = (r: Resource<any>, k: string) => {
+      const raw = storage.get(k)
+      if (raw === null) return
+      try {
+        applyResource(app, r, JSON.parse(raw))
+      } catch {
+        console.warn(`[save] ignoring unreadable saved ${r.name}; it will be overwritten.`)
+      }
+    }
     const persisted = (options.persist ?? []).map((r) => {
       const k = `${key}:persist:${r.name}`
       app.init(r)
-      const raw = storage.get(k)
-      if (raw !== null) {
-        try {
-          applyResource(app, r, JSON.parse(raw))
-        } catch {
-          console.warn(`[save] ignoring unreadable saved ${r.name}; it will be overwritten.`)
-        }
-      }
+      loadPersisted(r, k)
       return { r, k, last: JSON.stringify(app.resource(r)) }
     })
+    // Recordings carry the stored saves, so a replay starts from the same slots and settings.
+    const prefix = `${key}:`
+    recordStartState(
+      app,
+      'save',
+      () => Object.fromEntries(storage.keys(prefix).map((k) => [k, storage.get(k)])),
+      (data) => {
+        for (const k of storage.keys(prefix)) storage.remove(k)
+        for (const [k, v] of Object.entries(data as Record<string, string | null>)) if (v !== null) storage.set(k, v)
+        for (const p of persisted) {
+          loadPersisted(p.r, p.k)
+          p.last = JSON.stringify(app.resource(p.r))
+        }
+      },
+    )
     const flush = () => {
       for (const p of persisted) {
         const json = JSON.stringify(app.resource(p.r))

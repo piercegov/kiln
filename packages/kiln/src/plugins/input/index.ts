@@ -118,7 +118,7 @@ class Controller implements InputController {
   readonly virtualKeys = new Set<string>()
   virtualAxis: { x: number; y: number } | null = null
   private queue: Pending[] = []
-  private recording: { start: number; events: ScriptEvent[]; last: Set<string> } | null = null
+  private recording: Recording | null = null
 
   constructor(
     private app: App,
@@ -135,7 +135,7 @@ class Controller implements InputController {
       if (typeof ev.frame !== 'number') {
         throw new KilnError('bad-script', `Every input script event needs a frame number. Got ${JSON.stringify(ev)}.`)
       }
-      if ('press' in ev) this.at(ev.frame, () => this.virtual.set(ev.press, 1))
+      if ('press' in ev) this.at(ev.frame, () => this.virtual.set(ev.press, ev.value ?? 1))
       else if ('release' in ev) this.at(ev.frame, () => this.virtual.delete(ev.release))
       else if ('tap' in ev) {
         this.at(ev.frame, () => this.virtual.set(ev.tap, 1))
@@ -153,6 +153,9 @@ class Controller implements InputController {
           p.dy += ev.pointer.y - p.y
           p.x = ev.pointer.x
           p.y = ev.pointer.y
+          if (ev.pointer.ndcX !== undefined) p.ndcX = ev.pointer.ndcX
+          if (ev.pointer.ndcY !== undefined) p.ndcY = ev.pointer.ndcY
+          if (ev.pointer.wheel) p.wheel += ev.pointer.wheel
           if (ev.pointer.down !== undefined) {
             if (ev.pointer.down) this.virtualKeys.add('Mouse0')
             else this.virtualKeys.delete('Mouse0')
@@ -191,14 +194,21 @@ class Controller implements InputController {
     return this
   }
 
-  record(): { stop(): ScriptEvent[] } {
-    const rec = { start: this.app.time.frame, events: [] as ScriptEvent[], last: new Set<string>() }
+  record(): { stop(): ScriptEvent[]; peek(): ScriptEvent[] } {
+    const rec: Recording = {
+      start: this.app.time.frame,
+      events: [],
+      values: new Map(),
+      axis: null,
+      pointer: { x: 0, y: 0, ndcX: 0, ndcY: 0, mouse: false },
+    }
     this.recording = rec
     return {
       stop: () => {
         if (this.recording === rec) this.recording = null
         return rec.events
       },
+      peek: () => rec.events.map((e) => structuredClone(e)),
     }
   }
 
@@ -212,15 +222,44 @@ class Controller implements InputController {
     for (const p of due) p.apply()
   }
 
-  /** Called after Input is updated, to record action edges. */
+  /** Called after Input is updated: records what changed since the last frame. */
   observe(state: InputState): void {
     const rec = this.recording
     if (!rec) return
     const frame = this.app.time.frame - rec.start
-    for (const a of state.downSet) if (!rec.last.has(a)) rec.events.push({ frame, press: a })
-    for (const a of rec.last) if (!state.downSet.has(a)) rec.events.push({ frame, release: a })
-    rec.last = new Set(state.downSet)
+    const ev = rec.events
+    // Action values, not raw keys: the replay doesn't depend on bindings or devices.
+    for (const [a, v] of state.values) {
+      if (rec.values.get(a) === v) continue
+      ev.push(v === 1 ? { frame, press: a } : { frame, press: a, value: v })
+    }
+    for (const a of rec.values.keys()) if (!state.values.has(a)) ev.push({ frame, release: a })
+    rec.values = new Map(state.values)
+    // The axis follows the actions unless a stick or a script overrides it; record only overrides.
+    const over = this.virtualAxis !== null || this.raw.stick.active
+    const axis = over ? { x: state.axis.x, y: state.axis.y } : null
+    const last = rec.axis
+    if (axis ? !last || last.x !== axis.x || last.y !== axis.y : last) ev.push({ frame, axis })
+    rec.axis = axis
+    const p = state.pointer
+    const lp = rec.pointer
+    const mouse = this.raw.keys.has('Mouse0') || this.raw.tapped.has('Mouse0') || this.virtualKeys.has('Mouse0')
+    if (p.x !== lp.x || p.y !== lp.y || p.ndcX !== lp.ndcX || p.ndcY !== lp.ndcY || p.wheel !== 0 || mouse !== lp.mouse) {
+      const pointer: Extract<ScriptEvent, { pointer: unknown }>['pointer'] = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY }
+      if (mouse !== lp.mouse) pointer.down = mouse
+      if (p.wheel !== 0) pointer.wheel = p.wheel
+      ev.push({ frame, pointer })
+      rec.pointer = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY, mouse }
+    }
   }
+}
+
+interface Recording {
+  start: number
+  events: ScriptEvent[]
+  values: Map<string, number>
+  axis: { x: number; y: number } | null
+  pointer: { x: number; y: number; ndcX: number; ndcY: number; mouse: boolean }
 }
 
 /** Map/Set.clear() allocates a fresh table even when empty, so skip it when there is nothing to clear. */
@@ -424,8 +463,8 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
         rp.dx = 0
         rp.dy = 0
         rp.wheel = 0
-        clear(raw.tapped)
         ctl.observe(state)
+        clear(raw.tapped)
       },
       { name: 'PollInput', unchecked: true },
     )

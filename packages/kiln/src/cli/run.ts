@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import type { Args } from './args.ts'
 import { list, num } from './args.ts'
 import { buildApp, loadGame } from './load.ts'
+import type { App } from '../core/app.ts'
 import { snapshotTraitsByName } from '../core/snapshot.ts'
 import { KilnError } from '../core/errors.ts'
 import { objectByName } from '../core/names.ts'
@@ -23,38 +24,12 @@ export default async function run(args: Args, root: string): Promise<number> {
   const app = await buildApp(game)
   try {
     app.boot()
-    const traits = list(args.snapshot)
-    const traitList = traits.length ? snapshotTraitsByName(traits) : undefined
-    const resNames = list(args.resources)
-    const resources = resNames.length
-      ? resNames.map((n) => {
-          const r = app.resourceList().find((x) => x.name === n) ?? (objectByName(n) as any)
-          if (!isResource(r)) {
-            const known = app.resourceList().map((x) => x.name).join(', ')
-            throw new KilnError('unknown-resource', `No resource named "${n}" (known: ${known}). Check the export name.`)
-          }
-          return r
-        })
-      : undefined
-    const eventNames = list(args.events)
-    const events = eventNames.map((n) => {
-      const e = app.bus.registered().find((x) => x.name === n) ?? (objectByName(n) as any)
-      if (!isEvent(e)) throw new KilnError('unknown-event', `No event named "${n}". Register it with app.init(${n}) or emit it once.`)
-      return e
-    })
+    const sample = sampler(app, args)
     if (typeof args.script === 'string') {
       const script = JSON.parse(readFileSync(resolve(root, args.script), 'utf8')) as ScriptEvent[]
       app.input.script(script)
     }
-    const precision = num(args.precision, 4)
     const every = num(args.every, 0)
-    const sample = () => {
-      const snap = app.snapshot({ traits: traitList, resources, precision, omitDefaults: args.full !== true }) as any
-      if (events.length) {
-        snap.events = Object.fromEntries(events.map((e) => [e.name, app.events(e)]))
-      }
-      return snap
-    }
     if (every > 0) {
       for (let done = 0; done < steps; ) {
         const n = Math.min(every, steps - done)
@@ -69,5 +44,36 @@ export default async function run(args: Args, root: string): Promise<number> {
     return 0
   } finally {
     app.dispose()
+  }
+}
+
+/** The snapshot printer behind --snapshot, --resources, --events, --precision and --full. */
+export function sampler(app: App, args: Args): () => Record<string, unknown> {
+  const traits = list(args.snapshot)
+  const traitList = traits.length ? snapshotTraitsByName(traits) : undefined
+  const resNames = list(args.resources)
+  const resources = resNames.length
+    ? resNames.map((n) => {
+        const r = app.resourceList().find((x) => x.name === n) ?? (objectByName(n) as any)
+        if (!isResource(r)) {
+          const known = app.resourceList().map((x) => x.name).join(', ')
+          throw new KilnError('unknown-resource', `No resource named "${n}" (known: ${known}). Check the export name.`)
+        }
+        return r
+      })
+    : undefined
+  const eventNames = list(args.events)
+  const events = eventNames.map((n) => {
+    const e = app.bus.registered().find((x) => x.name === n) ?? (objectByName(n) as any)
+    if (!isEvent(e)) throw new KilnError('unknown-event', `No event named "${n}". Register it with app.init(${n}) or emit it once.`)
+    return e
+  })
+  const precision = num(args.precision, 4)
+  return () => {
+    const snap = app.snapshot({ traits: traitList, resources, precision, omitDefaults: args.full !== true }) as any
+    if (events.length) {
+      snap.events = Object.fromEntries(events.map((e) => [e.name, app.events(e)]))
+    }
+    return snap
   }
 }

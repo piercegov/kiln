@@ -7,8 +7,9 @@
  *   kiln.config.ts `hotReload`: 'snapshot' rebuilds the app and restores the last snapshot,
  *   'keep' and false reload the page.
  * - `/__kiln/shot` serves the page `kiln shot` screenshots.
+ * - `POST /__kiln/recording?name=x` writes a session recording (F8 in the game) to recordings/x.json.
  */
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Plugin, ViteDevServer } from 'vite'
 import { addNames } from './names.ts'
@@ -65,6 +66,28 @@ export function kiln(options: KilnViteOptions = {}): Plugin {
     },
     configureServer(s) {
       server = s
+      s.middlewares.use((req, res, next) => {
+        if (req.method !== 'POST' || !req.url?.startsWith('/__kiln/recording')) return next()
+        const name = new URL(req.url, 'http://x').searchParams.get('name') ?? 'session'
+        const safe = name.replace(/[^\w.-]+/g, '-').replace(/^[.-]+/, '').slice(0, 80) || 'session'
+        const chunks: Buffer[] = []
+        req.on('data', (c: Buffer) => chunks.push(c))
+        req.on('end', () => {
+          try {
+            const body = Buffer.concat(chunks).toString('utf8')
+            JSON.parse(body)
+            mkdirSync(resolve(root, 'recordings'), { recursive: true })
+            const path = `recordings/${safe}.json`
+            writeFileSync(resolve(root, path), body)
+            s.config.logger.info(`[kiln] saved ${path}`)
+            res.setHeader('content-type', 'application/json')
+            res.end(JSON.stringify({ path }))
+          } catch (err) {
+            res.statusCode = 400
+            res.end(String(err))
+          }
+        })
+      })
       s.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/__kiln/shot')) return next()
         const html = await s.transformIndexHtml(req.url, shotPage(entry))

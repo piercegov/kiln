@@ -47,9 +47,15 @@ function relationOf(t: Trait): Relation<Trait> | null {
   return (t[$internal] as any).relation ?? null
 }
 
+/** Three.js objects have toJSON, but their JSON is scene data with random uuids, not game state. */
+function isThreeObject(v: any): boolean {
+  return !!(v.isObject3D || v.isMaterial || v.isBufferGeometry || v.isTexture)
+}
+
 function jsonable(v: unknown, depth = 0): boolean {
   if (v === null || ['number', 'string', 'boolean'].includes(typeof v)) return true
   if (depth > 4 || typeof v !== 'object') return false
+  if (isThreeObject(v)) return false
   if (typeof (v as any).toJSON === 'function') return true
   const proto = Object.getPrototypeOf(v)
   if (Array.isArray(v)) return v.every((x) => jsonable(x, depth + 1))

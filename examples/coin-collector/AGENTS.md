@@ -10,6 +10,7 @@ its JSDoc. Re-run `kiln docs` after changing exports or the schedule.
 ```bash
 kiln describe            # traits, systems in run order (reads/writes/after), resources, events
 kiln test                # bun test over scenarios/ (headless, deterministic)
+kiln replay recordings/x.json        # replay a play session the user recorded (F8 in the game)
 kiln run --steps 600 --snapshot Transform,Health --resources Score   # JSON world after N steps
 kiln check               # determinism lint (Math.random, Date.now, performance.now)
 kiln shot --steps 120 out.png        # one rendered frame from headless Chromium, when you need eyes
@@ -47,11 +48,19 @@ here. Import everything from `'kiln'` (physics from `'kiln/physics'`, tests from
 ## Core API
 
 ```ts
-import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, resource, event,
-  prefab, plugin, createApp, CorePlugins, Startup, InputPhase, Fixed, Update, Late, Render,
-  Transform, ChildOf, Rng, Input, Camera, Scene, MeshRef, SharedMesh, Instanced, defineInstanced,
-  Assets, Model, setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
+import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, runIf, resource, event,
+  prefab, plugin, state, inState, onEnter, onExit, despawnOnExit, createApp, CorePlugins, Startup,
+  InputPhase, Fixed, Update, Late, Render, Transform, ChildOf, Rng, Input, Camera, Scene, MeshRef,
+  SharedMesh, Instanced, defineInstanced, Assets, Model, Timer, Lifetime, Delayed, Tweens, Ui, UiClick,
+  CameraPlugin, CameraTarget, CameraShake, CameraRig, savePlugin, Saves, animationGraph,
+  SpriteAnimationPlugin, spriteSheet, spriteAnimator, SpriteAnimator, AnimateSprites,
+  SkeletalAnimationPlugin, animator, Animator, AnimateModels, AnimationEvent,
+  setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
 ```
+
+`CorePlugins` = core (Time, Rng), render, input, assets, timers, tweens, HUD/UI, debug. Add
+`CameraPlugin`, `savePlugin({...})`, `SpriteAnimationPlugin`, `SkeletalAnimationPlugin` and
+`PhysicsPlugin` (from `'kiln/physics'`) when you need them.
 
 | Helper | Use |
 |---|---|
@@ -63,6 +72,8 @@ import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, 
 | `system({ q1: [...], q2: [...] }, ({ q1, q2 }, ctx) => …)` | Runs once per step with views: `.first()`, `.forEach(e)`, `.each(([row], e))`, `.length`. |
 | `system((ctx) => …)` | Runs once per step. |
 | `chain(A, B, C)` / `A.after(B)` / `A.before(B)` | Order inside a phase. File order never matters. |
+| `runIf(cond, ...systems)` | Runs those systems only while `cond({ res, time })` is true. Nests; keeps their order. |
+| `state(['menu', 'playing'], 'menu')` | A state machine resource. `res.mut(S).set('playing')`; see States. |
 | `resource({ value: 0 })` | Singleton. `res.get(R)` reads, `res.mut(R)` writes. |
 | `event<{ a: Entity }>()` | `events.emit(E, data)`, `events.read(E)` (each reader sees each event once). |
 | `prefab((p: P) => [Transform({...}), …])` | Named spawn recipe: `commands.spawn(Enemy, { at })`. |
@@ -92,9 +103,9 @@ named queries may each take `Mut(T)`; the system's write set is their union. Str
 also create themselves with their defaults on first use, but listing them in `.init` makes them show
 in `kiln describe` and snapshots from the start.
 
-**Timers:** count steps, not floats. Subtracting `time.step` 3600 times leaves ~1e-12, so a
-`remaining <= 0` check fires one step late. Store a tick count (`time.tick`) or an integer frame
-counter and derive seconds from it, or snap values below `time.step / 2` to zero.
+**Timers:** use the built-in `Timer`, `Lifetime` and `Delayed` (see Timers and tweens); they count
+fixed steps. If you hand-roll one, count steps, not floats: subtracting `time.step` 3600 times leaves
+~1e-12, so a `remaining <= 0` check fires one step late.
 
 ## Phases (per frame)
 
@@ -161,6 +172,166 @@ handle at once: check `handle.ready` / `handle.failed` / `handle.value` in syste
 system. `commands.spawn(Transform, Model(assets.gltf('models/ship.glb')))` gets a `MeshRef` once loaded.
 Start loads in `Startup`; scenarios wait for them before the test body runs.
 
+## States (menus, pause, game over, levels)
+
+```ts
+// src/data.ts
+/** Which screen the game is on. */
+export const Screen = state(['menu', 'playing', 'paused', 'gameover'], 'menu')
+// src/main.ts
+  .init(Screen)
+  .add(Fixed, runIf(inState(Screen, 'playing'), chain(PlayerMove, Movement, Collide)))
+  .add(Update, runIf(onEnter(Screen, 'menu'), ShowMenu), runIf(onExit(Screen, 'menu'), HideMenu))
+```
+
+- `res.mut(Screen).set('playing')` applies at the start of the next frame (the last `set` wins);
+  `res.get(Screen).current`, `.previous`, `.is('paused')`. Unknown values throw with the list.
+- `onEnter(S, v)` / `onExit(S, v)` / `stateChanged(S)` are true for one frame (one step in Fixed)
+  after the transition; the initial value counts as entered on frame 1. Use them in Update or Fixed,
+  not Startup.
+- `commands.spawn(..., despawnOnExit(Screen, 'playing'))`: despawned when `playing` is left. Spawn
+  level entities this way and a restart is `gameover` → `playing` with a spawn system on `onEnter`.
+- Any function of `{ res, time }` is a condition: `runIf(({ res }) => res.get(Score).value > 10, X)`,
+  `not(cond)`. `kiln describe` lists each system's conditions.
+
+## Timers and tweens (in CorePlugins)
+
+```ts
+commands.spawn(Timer({ duration: 2 }), IsBomb)          // one-shot; Timer({ duration: 0.5, repeat: true })
+commands.spawn(Transform, Bullet, Lifetime({ seconds: 1.5 }))   // despawns itself
+system([Timer, IsBomb], ([t], { commands, entity }) => { if (t.justFinished) commands.despawn(entity) })
+res.mut(Delayed).emit(3, RoundStart, { round: 2 })      // event 3 s from now, in Fixed; .cancel(E)
+```
+
+`Timer` fields: `duration repeat paused` (set) and `ticks elapsed remaining finished justFinished
+count` (read). `justFinished` is true for exactly one fixed step; Update systems read the
+`TimerFinished` event (`{ entity, count }`) instead. A system that takes `Mut(Timer)` (to restart one
+with `restartTimer(row)`) goes `.after(TickTimers)`.
+
+```ts
+const tw = res.mut(Tweens)
+tw.to(entity, Transform, { y: 2, sx: 1.5 }, { duration: 0.4, ease: 'outBack' })
+tw.to(pending, Transform, { sx: 1, sy: 1, sz: 1 }, { from: { sx: 0, sy: 0, sz: 0 }, delay: 0.1 })  // right after commands.spawn
+tw.to(e, Transform, { y: 1 }, { duration: 0.3, yoyo: true, repeat: -1 })   // bob forever
+tw.to(e, Transform, { sx: 1.3 }, { duration: 0.1 }).then(e, Transform, { sx: 0 }, { duration: 0.2, despawn: true })
+tw.to(res.mut(Fade), { alpha: 1 })                      // plain objects (resources) too
+```
+
+Tweens run in Fixed (deterministic; the render interpolates). Any trait's number fields work. Options:
+`duration` (0.3), `ease` (`linear`, `in/out/inOut` + `Quad Cubic Quart Sine Expo Back Elastic Bounce`,
+or a function), `delay`, `repeat` (-1 forever), `yoyo`, `from` (shown at once, even during the delay),
+`tag`, `despawn`. A newer tween on the same fields takes them over. `tw.cancel(e)`, `tw.isTweening(e)`.
+`TweenDone` (`{ id, tag, entity }`) fires when one finishes. `ease.outBack(t)` etc. are exported too.
+
+## HUD and UI (in CorePlugins)
+
+```ts
+export const UpdateHud = system(({ res }) => {
+  const ui = res.mut(Ui)
+  ui.text('score', `Score ${res.get(Score).value}`)                         // top-left by default
+  ui.bar('hp', hp / maxHp, { anchor: 'bottom-left', label: 'HP', color: '#f55' })
+})
+// a menu: buttons emit UiClick; `action` also clicks it from the keyboard/gamepad
+ui.text('menu.title', 'Coin Rush', { anchor: 'center', size: 56 })
+ui.button('menu.start', 'Start', { anchor: 'center', action: 'jump' })
+for (const c of events.read(UiClick)) if (c.id === 'menu.start') res.mut(Screen).set('playing')
+ui.clear('menu.')                                                            // every id with the prefix
+```
+
+Elements are retained data keyed by id: setting the same value again costs nothing, so set them
+every frame if that is simpler. Anchors: `top-left top top-right left center right bottom-left bottom
+bottom-right`; options `size color order visible` (bars: `label width`; buttons: `action`).
+`ui.show(id, false)`, `ui.remove(id)`. Headless the same data exists, so tests assert
+`app.res(Ui).get('score')?.text` and press buttons with `app.res(Ui).click('menu.start')` (UiClick
+arrives on the next step). The DOM is drawn over the canvas, and `kiln shot` includes it.
+
+## Camera (`CameraPlugin`)
+
+```ts
+app.use(CorePlugins, CameraPlugin)
+commands.spawn(Player, ..., CameraTarget)          // or add CameraTarget to the Player prefab
+res.mut(CameraRig).offset = { x: 0, y: 8, z: 10 }  // 3D default 0,10,12; 2D default 0,0,100
+events.emit(CameraShake, { amount: 0.4 })          // from any system; or res.mut(CameraRig).shake(0.4)
+```
+
+`CameraRig` fields: `offset`, `smoothing` (catch-up per second, 0 snaps), `lookAt` (3D), `bounds`
+(`{ minX, maxX, minY, ... }` clamps the focus), `zoom`, shake tuning `maxOffset maxAngle decay`,
+`enabled` (false hands the Camera back to your systems). Shake is trauma²: 0.2 bump, 0.5 hit,
+1 explosion; it decays on its own. Don't also move `res.mut(Camera)` yourself while the rig is enabled.
+
+## Saving (`savePlugin`)
+
+```ts
+app.use(CorePlugins, savePlugin({ key: 'my-game', resources: [Level, Inventory], traits: [IsPlayer, Transform, Health], persist: [Settings, HighScore] }))
+res.mut(Saves).save('slot1')     // writes now, emits Saved
+res.mut(Saves).load('slot1')     // false if missing; applies next frame start, then emits Loaded
+res.get(Saves).has('slot1'), .slots(), .delete('slot1')
+```
+
+- `resources` are written to slots; `traits` picks entities (any entity with one of them) and the
+  values saved for them. Loading replaces those entities and leaves the rest. Three.js objects
+  (`MeshRef`) are not saved: re-add visuals on `Loaded`, or with a system over `[IsCoin, Not(MeshRef)]`.
+- `persist` resources load before Startup and save themselves whenever they change (localStorage in
+  the browser, memory headless). Tests pass `storage: memoryStorage()` to share one store between apps.
+
+## Animation (`SpriteAnimationPlugin`, `SkeletalAnimationPlugin`)
+
+Both plugins share one API: an animation graph as data, an animator component per entity, and events.
+
+```ts
+// src/data.ts
+/** The hero's frames: 4x4 grid, frames numbered left to right, top to bottom. */
+export const HeroSheet = spriteSheet({ texture: 'sprites/hero.png', columns: 4, rows: 4, size: [2, 2], pivot: [0.5, 0],
+  clips: { idle: { range: [0, 3], fps: 4 }, run: { range: [4, 7], fps: 10 }, attack: { range: [8, 11], fps: 14, loop: 'once' } } })
+/** States, transitions and events of the hero's animation. */
+export const HeroAnim = animationGraph({
+  initial: 'idle',
+  params: { speed: 0 },                       // numbers or booleans, with defaults
+  triggers: ['attack'],
+  fade: 0.15,                                 // default crossfade seconds (3D; sprites switch at once)
+  states: {
+    idle: {},                                 // plays the clip with the state's name; or { clip: 'Idle_Loop' }
+    run: { events: [{ frame: 0, name: 'footstep' }, { frame: 2, name: 'footstep' }] },   // glTF: { at: 0.4, name }
+    attack: { loop: 'once', events: [{ frame: 2, name: 'hitFrame' }] },
+  },
+  transitions: [                              // checked in order each step; the first that holds fires
+    { from: ['idle', 'run'], to: 'attack', trigger: 'attack' },
+    { from: 'attack', to: 'idle', exitTime: 1 },                   // when the clip has played once
+    { from: 'idle', to: 'run', when: { speed: { gt: 0.1 } } },     // gt gte lt lte eq ne, or a value
+    { from: 'run', to: 'idle', when: { speed: { lte: 0.1 } } },
+  ],
+})
+// 2D: app.use(CorePlugins, SpriteAnimationPlugin); the entity gets its quad (MeshRef) automatically
+commands.spawn(Transform, spriteAnimator(HeroSheet, { graph: HeroAnim }))
+// 3D: app.use(CorePlugins, SkeletalAnimationPlugin); clips come from the Model's glTF
+commands.spawn(Transform, Model(assets.gltf('models/hero.glb')), animator({ graph: HeroAnim }))
+// gameplay sets params and triggers; in Fixed, order it before the animation step
+export const HeroControl = system([Mut(SpriteAnimator), Velocity, IsHero], ([anim, v], { res }) => {
+  anim.set('speed', Math.abs(v.x))
+  if (res.get(Input).pressed('fire')) anim.trigger('attack')
+  anim.flipX = v.x < 0                        // sprites only
+})
+//   .add(Fixed, HeroControl.before(AnimateSprites))      (3D: .before(AnimateModels))
+// react to events anywhere (each reader sees each once)
+for (const ev of events.read(AnimationEvent)) if (ev.name === 'hitFrame') { /* ev.entity, ev.state */ }
+```
+
+- Rows (`Mut(SpriteAnimator)` / `Mut(Animator)`) have `set(param, v)`, `trigger(name)`, `play(state, {
+  fade, restart })`, `speed`, `paused`, and read `state`, `is(s)`, `get(param)`, `time`,
+  `normalizedTime` (plays so far), `finished`, `weight` (crossfade). Sprites add `frame`, `clipFrame`,
+  `flipX`; 3D adds `mixer`, `action(clip)`. No graph: one state per clip, switched with `play('run')`.
+- Clips: `range: [first, last]` or `frames: [...]`, `fps` (10), `loop: 'loop' | 'once' | 'pingpong'`.
+  Atlas sheets: `atlas: { width, height, frames: [{ x, y, w, h }] }` in pixels. `pivot` [0.5, 0] puts
+  the Transform at the feet; `filter: 'linear'` for non-pixel art.
+- Triggers last one animation step unless a transition takes them. `'*'` as `from` means any state but
+  `to`. play() applies at the next step and skips transitions.
+- Events: `AnimationEvent { entity, name, state }` when a frame first shows (or a time is reached),
+  every loop; `AnimationStateChanged { entity, from, to }`; `AnimationFinished { entity, state }` when
+  a `once` clip ends. Emitted in Fixed, so gameplay reacting to `hitFrame` in Fixed is deterministic.
+- Animation ticks in Fixed (`AnimateSprites`, `AnimateModels`). 3D poses are sampled at the fixed rate;
+  each entity has its own AnimationMixer, stopped and uncached on despawn. Animators show in
+  `kiln run --snapshot SpriteAnimator` but aren't saved: re-add them on `Loaded`.
+
 ## Physics (`kiln/physics`, Rapier)
 
 ```ts
@@ -205,6 +376,48 @@ App methods for tests and tools: `step(n)`, `spawn(...)`, `despawn(e)`, `get(e, 
 `has(e, T)`, `query(...)`, `res(R)` (mutable), `emit(E, data)`, `events(E)`, `snapshot({ traits,
 resources, precision })`, `diff(a, b)`, `restore(snap)`, `describe()`. `scenarioApp(options)` builds an
 app yourself (dispose it after).
+
+## Reproducing a bug from a play session (recordings)
+
+In dev, every browser session records from boot. **F8** saves it to `recordings/<name>.json` in the
+game folder (a crash saves `recordings/crash-....json` on its own; `__kiln_save_recording(name)` does
+it from the console or Playwright). A recording holds the seed and loop config, every frame's delta,
+what the game saw from input (action values, stick axis, pointer), DOM HUD clicks, the frame each
+asset load finished on, the stored saves the session started with, and a state hash every 60 frames.
+When a user says "I recorded it", replay it before reading code:
+
+```bash
+kiln replay recordings/x.json --snapshot IsPlayer,Transform --resources Score   # end state + summary
+kiln replay recordings/x.json --until 300 --events Hit                      # stop where it went wrong
+kiln replay recordings/x.json --every 60 --snapshot Health                  # one JSON line per 60 frames
+```
+
+The summary says how many frames played, `divergedAt` (the first checkpoint whose state differs from
+the session, or null), `endMatches`, and `threw`/`reproduced` when the session crashed. `divergedAt:
+null` on unchanged code means the headless replay is the session; investigate it with `--until`. Then
+keep it as a regression test that fails until the fix lands:
+
+```ts
+import { expect, replay } from 'kiln/test'
+
+replay('coin pickup no longer double-counts', 'recordings/double-coin.json', ({ app, result }) => {
+  expect(app.res(Score).value).toBe(3)      // the app is live after the last frame: step it, query it
+})                                           // a recorded crash re-throws at the same frame
+```
+
+After a fix, `divergedAt` is expected (the fixed code produces different state); input still replays
+frame for frame, so assert on the outcome, not on matching the old session. `replayApp(rec, { until })`
+returns `{ app, result, replayer }` to play in pieces (`await replayer.play(900)`).
+
+What can make a replay drift from the browser (it shows as an early `divergedAt` on unchanged code):
+reading anything outside `ctx.time`, `Rng` and the input plugin (`Math.random`, `Date.now`, DOM
+state; `kiln check` flags these), hot reloads during the session (a system swap is listed in the
+recording's notes; the replay runs today's code throughout), and **physics**: Rapier runs the same
+WASM in the browser and under Bun, which usually matches, but cross-machine determinism is not
+guaranteed (see design decisions), and `Math.sin`/`cos`/`pow` can differ in the last bit between
+Chrome's V8 and Bun's JavaScriptCore, so long physics-heavy replays can drift. Read frames before
+`divergedAt` as exact and frames after it as approximate. Plugins with outside input of their own use
+`noteChannel(app, kind, data)` / `replayChannel(app, kind, apply)` and `recordStartState(...)`.
 
 ## A complete feature
 
@@ -282,6 +495,13 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 | `X wrote T.f on the copy entity.get() returns` | write through the row, or `entity.set(T, {...})` with `Mut(T)` |
 | `app.step() ran while an async plugin is still loading` | `await app.ready()` (scenarios do it) |
 | `No trait named "X"` (kiln run) | check `kiln describe`; names come from exports |
+| `TickTimers and X both take Mut(Timer)` | `X.after(TickTimers)` |
+| `'x' is not a value of this state` | use one of the listed values, or add it to `state([...])` |
+| `Saves needs the save plugin` | `.use(savePlugin({ resources, traits, persist }))` |
+| `Ui.click('x'): there is no button 'x'` | the button isn't set yet (step first) or the id differs |
+| `AnimateSprites and X both take Mut(SpriteAnimator)` | `X.before(AnimateSprites)` (3D: `.before(AnimateModels)`) |
+| `No animation param 'x'` / `trigger` / `state` | declare it in the graph's `params` / `triggers` / `states` |
+| `Animation state 's' plays clip 'c', which ... doesn't have` | set the state's `clip` to one of the listed clips |
 
 <!-- kiln:generated:start (kiln docs rewrites everything below; edit above) -->
 

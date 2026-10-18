@@ -6,6 +6,7 @@ import type { App } from './core/app.ts'
 import { isSystem, type System } from './core/system.ts'
 import { PHASES } from './core/schedule.ts'
 import type { Snapshot } from './core/snapshot.ts'
+import { Recorder, type Recording } from './core/recording.ts'
 import { Renderer } from './plugins/render/index.ts'
 
 export type MainFn = () => App | Promise<App>
@@ -13,6 +14,68 @@ export type MainFn = () => App | Promise<App>
 declare global {
   // eslint-disable-next-line no-var
   var __kiln_app: App | undefined
+  /** Saves the session recording to recordings/ (dev server) and resolves to its path. F8 does the same. */
+  // eslint-disable-next-line no-var
+  var __kiln_save_recording: ((name?: string) => Promise<string | null>) | undefined
+}
+
+let toastEl: HTMLDivElement | null = null
+function toast(text: string): void {
+  console.info(`[kiln] ${text}`)
+  if (typeof document === 'undefined') return
+  toastEl?.remove()
+  const el = (toastEl = document.createElement('div'))
+  el.style.cssText =
+    'position:fixed;left:12px;bottom:12px;z-index:99998;background:rgba(10,12,16,.85);color:#e8eef8;font:13px/1.4 ui-monospace,monospace;padding:6px 10px;border-radius:6px;pointer-events:none'
+  el.textContent = text
+  document.body.appendChild(el)
+  setTimeout(() => el.remove(), 4000)
+}
+
+function stamp(): string {
+  return new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+}
+
+/**
+ * Sends a recording to the dev server, which writes recordings/<name>.json in the game folder.
+ * Without a dev server (a production build), the browser downloads the file instead.
+ */
+async function storeRecording(rec: Recording, name: string): Promise<string> {
+  const body = JSON.stringify(rec)
+  try {
+    const res = await fetch(`/__kiln/recording?name=${encodeURIComponent(name)}`, { method: 'POST', body })
+    if (res.ok) return ((await res.json()) as { path: string }).path
+  } catch {
+    // No dev server: fall through to a download.
+  }
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([body], { type: 'application/json' }))
+  a.download = `${name}.json`
+  a.click()
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  return `${name}.json (downloaded)`
+}
+
+let recorder: Recorder | null = null
+
+/** Dev builds record every session from boot, so F8 or a crash can save a replayable recording. */
+function startRecording(app: App): void {
+  recorder = null
+  if (!app.dev || app.config.record === false || app.isBooted) return
+  recorder = new Recorder(app)
+  const save = async (name?: string): Promise<string | null> => {
+    if (!recorder || globalThis.__kiln_app !== app) {
+      toast('Nothing to save: hot reload rebuilt the app, so its session no longer replays from boot. Reload the page to record again.')
+      return null
+    }
+    const rec = recorder.take()
+    const path = await storeRecording(rec, name ?? `session-${stamp()}`)
+    toast(`Saved ${rec.frames} frames to ${path}. Replay it with \`kiln replay ${path}\`.`)
+    return path
+  }
+  globalThis.__kiln_save_recording = save
+  // The first error pauses the loop; save the session that led to it.
+  app.hooks.error.push(() => void save(`crash-${stamp()}`))
 }
 
 let overlayEl: HTMLDivElement | null = null
@@ -65,6 +128,13 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
     app = await main()
     globalThis.__kiln_app = app
     app.hooks.error.push(showError)
+    startRecording(app)
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'F8' && !e.repeat) {
+        e.preventDefault()
+        void globalThis.__kiln_save_recording?.()
+      }
+    })
     await app.start(canvas)
   } catch (err) {
     showError(err)
@@ -81,7 +151,10 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
       for (const [name, value] of Object.entries(mod)) {
         if (!isSystem(value)) continue
         const old = byName.get(value.name) ?? byName.get(name)
-        if (old && old !== value) current.replaceSystem(old, value)
+        if (old && old !== value) {
+          current.replaceSystem(old, value)
+          recorder?.addNote(`hot-swapped system ${value.name}; replays run the new code from frame 1`)
+        }
       }
       clearError()
       current.paused = false
@@ -109,6 +182,7 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
       next.hooks.error.push(showError)
       current.dispose()
       globalThis.__kiln_app = next
+      recorder = null
       await next.start(canvas, { startup: false })
       const { missingTraits } = next.restore(snap)
       if (missingTraits.length) console.warn(`[kiln] snapshot traits no longer exist: ${missingTraits.join(', ')}`)

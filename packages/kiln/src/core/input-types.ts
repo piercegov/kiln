@@ -1,6 +1,7 @@
 /** One step of an input script. `frame` counts frames after script() was called (1 = the next frame). */
 export type ScriptEvent = { frame: number } & (
-  | { press: string }
+  /** Hold an action down; `value` (default 1) for analog input such as a half-pulled trigger. */
+  | { press: string; value?: number }
   | { release: string }
   /** Press now, release one frame later. */
   | { tap: string }
@@ -10,8 +11,11 @@ export type ScriptEvent = { frame: number } & (
   | { key: string; up?: boolean }
   /** Override the move axis; null hands it back to the devices. */
   | { axis: { x: number; y: number } | null }
-  /** Pointer position in canvas pixels, optionally with the primary button state. */
-  | { pointer: { x: number; y: number; down?: boolean } }
+  /**
+   * Pointer position in canvas pixels, optionally with the primary button state, normalized device
+   * coords (recordings carry them; scripts can leave them out) and a wheel delta for that frame.
+   */
+  | { pointer: { x: number; y: number; down?: boolean; ndcX?: number; ndcY?: number; wheel?: number } }
 )
 
 /** What `app.input` exposes. Implemented by the input plugin. */
@@ -27,6 +31,10 @@ export interface InputController {
   clearAxis(): InputController
   /** Drops scripted state and pending events. */
   reset(): InputController
-  /** Starts recording live action changes; stop() returns them as a script. */
-  record(): { stop(): ScriptEvent[] }
+  /**
+   * Starts recording what the game sees as a script: action values (press/release), the move axis
+   * when a stick or script drives it, and the pointer. stop() returns it (peek() copies it so far);
+   * script() replays it.
+   */
+  record(): { stop(): ScriptEvent[]; peek(): ScriptEvent[] }
 }
