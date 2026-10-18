@@ -58,3 +58,5 @@ export { animationGraph, AnimationController, AnimationEvent, AnimationStateChan
 export type { AnimationGraph, AnimationGraphSpec, AnimationStateSpec, AnimationEventSpec, TransitionSpec, ParamTest, LoopMode } from './plugins/animation/index.ts'
 export { SpriteAnimationPlugin, SpriteAnimator, SpriteAnimation, spriteAnimator, spriteSheet, SpriteSheets, AnimateSprites } from './plugins/animation/index.ts'
 export type { SpriteSheet, SpriteSheetSpec, SpriteClipSpec, SpriteAnimatorOptions } from './plugins/animation/index.ts'
+export { SkeletalAnimationPlugin, Animator, ModelAnimation, animator, Mixers, AnimateModels } from './plugins/animation/index.ts'
+export type { AnimatorOptions } from './plugins/animation/index.ts'
