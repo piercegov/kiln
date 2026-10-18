@@ -355,6 +355,8 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       { name: 'Draw' },
     )
     app.add(Render, RenderSync, InstanceSync.after(RenderSync), Draw.after(RenderSync, InstanceSync))
+    // Other plugins order their Render work against these (e.g. the camera rig runs between them).
+    app.ext.renderSystems = { RenderSync, Draw }
 
     app.hooks.start.push(async (canvas) => {
       if (!canvas || typeof window === 'undefined') return
