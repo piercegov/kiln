@@ -2,6 +2,7 @@ import { $internal, $relation, type Trait } from 'koota'
 import type { App } from './app.ts'
 import { namedTraits, traitName } from './names.ts'
 import { PHASES } from './schedule.ts'
+import { conditionLabel } from './system.ts'
 
 export interface TraitInfo {
   name: string
@@ -17,6 +18,8 @@ export interface SystemInfo {
   writes: string[]
   /** Systems this one is ordered after (direct constraints). */
   after: string[]
+  /** Run conditions from runIf(); the system is skipped unless all hold. Absent when ungated. */
+  runIf?: string[]
   /** Resources seen at runtime. Empty until the app has run a step. */
   resources: { reads: string[]; writes: string[] }
 }
@@ -64,6 +67,7 @@ export function describeApp(app: App): AppDescription {
         reads: [...cs.reads].map(traitName).sort(),
         writes: [...cs.writes].map(traitName).sort(),
         after: (built.afters.get(cs.system) ?? []).map((s) => s.name),
+        ...(cs.conditions ? { runIf: cs.conditions.map(conditionLabel) } : {}),
         resources: {
           reads: [...cs.resReads].filter((r) => !cs.resWrites.has(r)).map((r) => r.name).sort(),
           writes: [...cs.resWrites].map((r) => r.name).sort(),
@@ -98,6 +102,7 @@ export function formatDescription(d: AppDescription): string {
       if (s.resources.writes.length) parts.push(`res-writes ${s.resources.writes.join(',')}`)
       if (s.resources.reads.length) parts.push(`res-reads ${s.resources.reads.join(',')}`)
       if (s.after.length) parts.push(`after ${s.after.join(',')}`)
+      if (s.runIf?.length) parts.push(`if ${s.runIf.join(' && ')}`)
       lines.push(parts.join(' | '))
     })
   }

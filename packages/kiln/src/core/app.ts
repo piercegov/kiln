@@ -35,7 +35,7 @@ import {
   type BuiltPhase,
   type Phase,
 } from './schedule.ts'
-import type { Res, Schedulable, System, SystemContext, TimeState } from './system.ts'
+import type { Condition, ConditionContext, Res, Schedulable, System, SystemContext, TimeState } from './system.ts'
 
 export type HotReloadMode = 'keep' | 'snapshot' | false
 
@@ -101,6 +101,9 @@ export class CompiledSystem implements GuardTarget {
   readonly ctx: SystemContext & { entity: Entity }
   readonly run: () => void
   readonly unchecked: boolean
+  /** Run conditions from runIf() gates; all must hold for the system to run. Set by app.build(). */
+  conditions: readonly Condition[] | null = null
+  readonly conditionCtx: ConditionContext
 
   constructor(
     readonly app: App,
@@ -121,6 +124,7 @@ export class CompiledSystem implements GuardTarget {
       world: app.dev && !this.unchecked ? readonlyWorld(world, () => guard.current) : world,
       entity: 0 as Entity,
     }
+    this.conditionCtx = { res: this.ctx.res, time: app.time }
     const nameFn = () => self.name
     const ctx = this.ctx
     const fn = system.fn
@@ -539,6 +543,7 @@ export class App {
           const key = `${p.order}:${s.id}`
           let cs = this.compiledCache.get(key)
           if (!cs) this.compiledCache.set(key, (cs = new CompiledSystem(this, s, p)))
+          cs.conditions = built.conditions.get(s) ?? null
           return cs
         }),
       )
@@ -575,6 +580,7 @@ export class App {
       const swap = (s: System) => (s === oldSystem ? newSystem : s)
       for (const s of b.systems) (nb as any).systems.push(swap(s))
       for (const e of b.edges) (nb as any).edges.push({ ...e, from: swap(e.from), to: swap(e.to) })
+      for (const [s, c] of b.conditions) nb.conditions.set(swap(s), c)
       this.builders.set(p, nb)
     }
     if (!found) return false
@@ -694,6 +700,8 @@ export class App {
     guard.current = cs
     const t0 = this.profile ? performance.now() : 0
     try {
+      const conds = cs.conditions
+      if (conds) for (let i = 0; i < conds.length; i++) if (!conds[i]!(cs.conditionCtx)) return
       cs.run()
     } catch (err) {
       throw wrapSystemError(err, cs)

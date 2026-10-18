@@ -5,9 +5,11 @@ export type { Entity, World, Trait, TraitRecord, ConfigurableTrait, Relation } f
 
 export { Mut, Changed, Added, Removed } from './core/access.ts'
 export type { MutParam, QueryParam, QueryList, QueryView, Row } from './core/access.ts'
-export { system, chain } from './core/system.ts'
-export type { System, SystemEntry, Chain, Schedulable, SystemContext, EntityContext, Res, TimeState, SystemOptions } from './core/system.ts'
+export { system, chain, runIf, not, withLabel } from './core/system.ts'
+export type { System, SystemEntry, Chain, Gate, Condition, ConditionContext, Schedulable, SystemContext, EntityContext, Res, TimeState, SystemOptions } from './core/system.ts'
 export { resource } from './core/resource.ts'
+export { state, inState, onEnter, onExit, stateChanged, despawnOnExit, DespawnOnExit, StateValue } from './core/state.ts'
+export type { State } from './core/state.ts'
 export type { Resource } from './core/resource.ts'
 export { event } from './core/event.ts'
 export type { EventType, Events } from './core/event.ts'

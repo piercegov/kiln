@@ -8,6 +8,7 @@ import type { Resource } from './resource.ts'
 export const $system = Symbol.for('kiln.system')
 export const $entry = Symbol.for('kiln.entry')
 export const $chain = Symbol.for('kiln.chain')
+export const $gate = Symbol.for('kiln.gate')
 
 /** Clock values a system sees. All in seconds except `frame` and `tick`. */
 export interface TimeState {
@@ -93,7 +94,26 @@ export interface Chain {
   readonly items: readonly Schedulable[]
 }
 
-export type Schedulable = System | SystemEntry | Chain
+/** What a run condition sees: resources (reads are recorded for `kiln describe`) and the clock. */
+export interface ConditionContext {
+  readonly res: Res
+  readonly time: Readonly<TimeState>
+}
+
+/**
+ * A run condition: `({ res }) => res.get(Score).value > 10`. Checked before each run of each system
+ * it gates; false skips that run. `label` is how `kiln describe` shows it.
+ */
+export type Condition = ((ctx: ConditionContext) => boolean) & { label?: string }
+
+/** Systems that only run while a condition holds, returned by `runIf(cond, ...)`. */
+export interface Gate {
+  readonly [$gate]: true
+  readonly condition: Condition
+  readonly items: readonly Schedulable[]
+}
+
+export type Schedulable = System | SystemEntry | Chain | Gate
 
 let nextId = 1
 
@@ -176,11 +196,43 @@ export function chain(...items: Schedulable[]): Chain {
   return { [$chain]: true, items }
 }
 
+/**
+ * Runs the given systems only while `cond` is true: `runIf(inState(Screen, 'playing'), chain(A, B), C)`.
+ * Order works as without it: a gated chain still runs in order, `.after()` still applies. Gates nest
+ * (all conditions must hold). Skipped systems don't read events, so they see them when they run again
+ * only if the events are still alive (two runs of the emitting phase).
+ */
+export function runIf(cond: Condition, ...items: Schedulable[]): Gate {
+  if (typeof cond !== 'function') {
+    throw new TypeError('runIf() takes a condition function first: runIf(inState(Screen, \'playing\'), MySystem).')
+  }
+  return { [$gate]: true, condition: cond, items }
+}
+
+/** A condition that is true when `cond` is false. */
+export function not(cond: Condition): Condition {
+  return withLabel((ctx) => !cond(ctx), `not(${conditionLabel(cond)})`)
+}
+
+/** Gives a condition the label `kiln describe` prints for it. */
+export function withLabel(cond: Condition, label: string): Condition {
+  ;(cond as { label?: string }).label = label
+  return cond
+}
+
+/** How `kiln describe` names a condition: its label, else its function name. */
+export function conditionLabel(cond: Condition): string {
+  return cond.label ?? (cond.name || 'condition')
+}
+
 export function isSystem(x: unknown): x is System {
   return typeof x === 'object' && x !== null && (x as any)[$system] === true
 }
 export function isEntry(x: unknown): x is SystemEntry {
   return typeof x === 'object' && x !== null && (x as any)[$entry] === true
+}
+export function isGate(x: unknown): x is Gate {
+  return typeof x === 'object' && x !== null && (x as any)[$gate] === true
 }
 export function isChain(x: unknown): x is Chain {
   return typeof x === 'object' && x !== null && (x as any)[$chain] === true

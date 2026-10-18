@@ -15,7 +15,7 @@ export interface DocEntry {
 }
 
 const DOC_RE = /\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*export\s+(?:const|function|class|async function)\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?(?:=\s*(?:[\w$]+\.)?([\w$]+))?/g
-const EXPORT_RE = /^export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*(?:[\w$]+\.)?(system|trait|resource|event|prefab|plugin|relation)\b/gm
+const EXPORT_RE = /^export\s+const\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*(?:[\w$]+\.)?(system|trait|resource|event|prefab|plugin|relation|state)\b/gm
 
 function cleanDoc(raw: string): string {
   return raw

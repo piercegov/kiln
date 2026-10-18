@@ -1,11 +1,11 @@
 /**
  * The names transform, shared by kiln/vite and kiln/preload. Every
- * `const X = system|trait|resource|event|prefab|plugin|relation(...)`, at any depth, becomes
+ * `const X = system|trait|resource|event|prefab|plugin|relation|state(...)`, at any depth, becomes
  * `const X = globalThis.__kiln_named("X", system(...))` (guarded), so Kiln can name things after their
  * export in errors, snapshots and `kiln describe`. It is a runtime transform only; types are
  * untouched, and code it can't parse is left as it was.
  */
-const FACTORIES = ['system', 'trait', 'resource', 'event', 'prefab', 'plugin', 'relation']
+const FACTORIES = ['system', 'trait', 'resource', 'event', 'prefab', 'plugin', 'relation', 'state']
 const DECL = new RegExp(
   String.raw`(^|[\n;{}])([ \t]*(?:export\s+)?const\s+([A-Za-z_$][\w$]*)\s*(?::[^=\n]+)?=\s*)((?:[\w$]+\.)?(?:${FACTORIES.join('|')})\s*(?:<[^\n]*?>)?\s*\()`,
   'g',

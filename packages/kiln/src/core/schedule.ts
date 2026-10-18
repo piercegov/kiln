@@ -1,9 +1,11 @@
 import type { Trait } from 'koota'
 import { KilnError } from './errors.ts'
 import { traitName } from './names.ts'
-import { isChain, isEntry, isSystem, type Schedulable, type System } from './system.ts'
+import { isChain, isEntry, isGate, isSystem, type Condition, type Schedulable, type System } from './system.ts'
 
 export const $phase = Symbol.for('kiln.phase')
+/** Marks a gate's unordered contents while it is being added. */
+const GROUP = Symbol('kiln.group')
 
 /** A slot in the frame. Systems get their phase when added: `app.add(Fixed, Movement)`. */
 export interface Phase {
@@ -57,7 +59,10 @@ interface Edge {
 export class PhaseBuilder {
   readonly systems: System[] = []
   readonly edges: Edge[] = []
+  /** Run conditions per system, from runIf() gates (outermost first). */
+  readonly conditions = new Map<System, Condition[]>()
   private seen = new Set<System>()
+  private gates: Condition[] = []
 
   constructor(readonly phase: Phase) {}
 
@@ -70,6 +75,14 @@ export class PhaseBuilder {
     if (isSystem(item)) {
       this.addSystem(item)
       return { heads: [item], tails: [item] }
+    }
+    if (isGate(item)) {
+      this.gates.push(item.condition)
+      try {
+        return this.addItem(chainless(item.items))
+      } finally {
+        this.gates.pop()
+      }
     }
     if (isEntry(item)) {
       this.addSystem(item.system)
@@ -88,6 +101,16 @@ export class PhaseBuilder {
       })
       return { heads: first, tails: prevTails }
     }
+    if ((item as any)?.[GROUP]) {
+      const heads: System[] = []
+      const tails: System[] = []
+      for (const child of (item as any).items as Schedulable[]) {
+        const r = this.addItem(child)
+        heads.push(...r.heads)
+        tails.push(...r.tails)
+      }
+      return { heads, tails }
+    }
     throw new KilnError(
       'not-schedulable',
       `app.add(${this.phase.name}, ...) got ${describeValue(item)}. Pass systems made with system(), chain(...) or system.after(...).`,
@@ -103,7 +126,14 @@ export class PhaseBuilder {
     }
     this.seen.add(s)
     this.systems.push(s)
+    if (this.gates.length > 0) this.conditions.set(s, [...this.gates])
   }
+}
+
+/** Several unordered items treated as one for heads/tails (a gate's contents). */
+function chainless(items: readonly Schedulable[]): Schedulable {
+  if (items.length === 1) return items[0]!
+  return { [GROUP]: true, items } as unknown as Schedulable
 }
 
 function describeValue(x: unknown): string {
@@ -119,6 +149,8 @@ export interface BuiltPhase {
   order: System[]
   /** Direct predecessors of each system, for `kiln describe`. */
   afters: Map<System, System[]>
+  /** Run conditions per gated system. */
+  conditions: ReadonlyMap<System, Condition[]>
 }
 
 /**
@@ -212,7 +244,7 @@ export function buildPhase(
 
   const afters = new Map<System, System[]>()
   systems.forEach((s, i) => afters.set(s, preds[i]!.map((p) => systems[p]!)))
-  return { phase, order: order.map((i) => systems[i]!), afters }
+  return { phase, order: order.map((i) => systems[i]!), afters, conditions: b.conditions }
 }
 
 function findCycle(n: number, succs: number[][], indeg: number[]): number[] {
