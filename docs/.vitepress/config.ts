@@ -5,6 +5,8 @@ import apiSidebar from '../api/typedoc-sidebar.json' with { type: 'json' }
 export default defineConfig({
   title: 'Kiln',
   description: 'An agent-first ECS game runtime on Three.js and Koota.',
+  // GitHub Pages serves project sites under /<repo>/; CI sets DOCS_BASE.
+  base: process.env.DOCS_BASE ?? '/',
   cleanUrls: true,
   lastUpdated: false,
   srcExclude: ['README.md'],
