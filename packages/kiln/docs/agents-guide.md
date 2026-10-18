@@ -47,11 +47,16 @@ here. Import everything from `'kiln'` (physics from `'kiln/physics'`, tests from
 ## Core API
 
 ```ts
-import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, resource, event,
-  prefab, plugin, createApp, CorePlugins, Startup, InputPhase, Fixed, Update, Late, Render,
-  Transform, ChildOf, Rng, Input, Camera, Scene, MeshRef, SharedMesh, Instanced, defineInstanced,
-  Assets, Model, setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
+import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, runIf, resource, event,
+  prefab, plugin, state, inState, onEnter, onExit, despawnOnExit, createApp, CorePlugins, Startup,
+  InputPhase, Fixed, Update, Late, Render, Transform, ChildOf, Rng, Input, Camera, Scene, MeshRef,
+  SharedMesh, Instanced, defineInstanced, Assets, Model, Timer, Lifetime, Delayed, Tweens, Ui, UiClick,
+  CameraPlugin, CameraTarget, CameraShake, CameraRig, savePlugin, Saves,
+  setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
 ```
+
+`CorePlugins` = core (Time, Rng), render, input, assets, timers, tweens, HUD/UI, debug. Add
+`CameraPlugin`, `savePlugin({...})` and `PhysicsPlugin` (from `'kiln/physics'`) when you need them.
 
 | Helper | Use |
 |---|---|
@@ -63,6 +68,8 @@ import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, 
 | `system({ q1: [...], q2: [...] }, ({ q1, q2 }, ctx) => …)` | Runs once per step with views: `.first()`, `.forEach(e)`, `.each(([row], e))`, `.length`. |
 | `system((ctx) => …)` | Runs once per step. |
 | `chain(A, B, C)` / `A.after(B)` / `A.before(B)` | Order inside a phase. File order never matters. |
+| `runIf(cond, ...systems)` | Runs those systems only while `cond({ res, time })` is true. Nests; keeps their order. |
+| `state(['menu', 'playing'], 'menu')` | A state machine resource. `res.mut(S).set('playing')`; see States. |
 | `resource({ value: 0 })` | Singleton. `res.get(R)` reads, `res.mut(R)` writes. |
 | `event<{ a: Entity }>()` | `events.emit(E, data)`, `events.read(E)` (each reader sees each event once). |
 | `prefab((p: P) => [Transform({...}), …])` | Named spawn recipe: `commands.spawn(Enemy, { at })`. |
@@ -92,9 +99,9 @@ named queries may each take `Mut(T)`; the system's write set is their union. Str
 also create themselves with their defaults on first use, but listing them in `.init` makes them show
 in `kiln describe` and snapshots from the start.
 
-**Timers:** count steps, not floats. Subtracting `time.step` 3600 times leaves ~1e-12, so a
-`remaining <= 0` check fires one step late. Store a tick count (`time.tick`) or an integer frame
-counter and derive seconds from it, or snap values below `time.step / 2` to zero.
+**Timers:** use the built-in `Timer`, `Lifetime` and `Delayed` (see Timers and tweens); they count
+fixed steps. If you hand-roll one, count steps, not floats: subtracting `time.step` 3600 times leaves
+~1e-12, so a `remaining <= 0` check fires one step late.
 
 ## Phases (per frame)
 
@@ -160,6 +167,108 @@ app.input.script([
 handle at once: check `handle.ready` / `handle.failed` / `handle.value` in systems; never await in a
 system. `commands.spawn(Transform, Model(assets.gltf('models/ship.glb')))` gets a `MeshRef` once loaded.
 Start loads in `Startup`; scenarios wait for them before the test body runs.
+
+## States (menus, pause, game over, levels)
+
+```ts
+// src/data.ts
+/** Which screen the game is on. */
+export const Screen = state(['menu', 'playing', 'paused', 'gameover'], 'menu')
+// src/main.ts
+  .init(Screen)
+  .add(Fixed, runIf(inState(Screen, 'playing'), chain(PlayerMove, Movement, Collide)))
+  .add(Update, runIf(onEnter(Screen, 'menu'), ShowMenu), runIf(onExit(Screen, 'menu'), HideMenu))
+```
+
+- `res.mut(Screen).set('playing')` applies at the start of the next frame (the last `set` wins);
+  `res.get(Screen).current`, `.previous`, `.is('paused')`. Unknown values throw with the list.
+- `onEnter(S, v)` / `onExit(S, v)` / `stateChanged(S)` are true for one frame (one step in Fixed)
+  after the transition; the initial value counts as entered on frame 1. Use them in Update or Fixed,
+  not Startup.
+- `commands.spawn(..., despawnOnExit(Screen, 'playing'))`: despawned when `playing` is left. Spawn
+  level entities this way and a restart is `gameover` → `playing` with a spawn system on `onEnter`.
+- Any function of `{ res, time }` is a condition: `runIf(({ res }) => res.get(Score).value > 10, X)`,
+  `not(cond)`. `kiln describe` lists each system's conditions.
+
+## Timers and tweens (in CorePlugins)
+
+```ts
+commands.spawn(Timer({ duration: 2 }), IsBomb)          // one-shot; Timer({ duration: 0.5, repeat: true })
+commands.spawn(Transform, Bullet, Lifetime({ seconds: 1.5 }))   // despawns itself
+system([Timer, IsBomb], ([t], { commands, entity }) => { if (t.justFinished) commands.despawn(entity) })
+res.mut(Delayed).emit(3, RoundStart, { round: 2 })      // event 3 s from now, in Fixed; .cancel(E)
+```
+
+`Timer` fields: `duration repeat paused` (set) and `ticks elapsed remaining finished justFinished
+count` (read). `justFinished` is true for exactly one fixed step; Update systems read the
+`TimerFinished` event (`{ entity, count }`) instead. A system that takes `Mut(Timer)` (to restart one
+with `restartTimer(row)`) goes `.after(TickTimers)`.
+
+```ts
+const tw = res.mut(Tweens)
+tw.to(entity, Transform, { y: 2, sx: 1.5 }, { duration: 0.4, ease: 'outBack' })
+tw.to(pending, Transform, { sx: 1, sy: 1, sz: 1 }, { from: { sx: 0, sy: 0, sz: 0 }, delay: 0.1 })  // right after commands.spawn
+tw.to(e, Transform, { y: 1 }, { duration: 0.3, yoyo: true, repeat: -1 })   // bob forever
+tw.to(e, Transform, { sx: 1.3 }, { duration: 0.1 }).then(e, Transform, { sx: 0 }, { duration: 0.2, despawn: true })
+tw.to(res.mut(Fade), { alpha: 1 })                      // plain objects (resources) too
+```
+
+Tweens run in Fixed (deterministic; the render interpolates). Any trait's number fields work. Options:
+`duration` (0.3), `ease` (`linear`, `in/out/inOut` + `Quad Cubic Quart Sine Expo Back Elastic Bounce`,
+or a function), `delay`, `repeat` (-1 forever), `yoyo`, `from` (shown at once, even during the delay),
+`tag`, `despawn`. A newer tween on the same fields takes them over. `tw.cancel(e)`, `tw.isTweening(e)`.
+`TweenDone` (`{ id, tag, entity }`) fires when one finishes. `ease.outBack(t)` etc. are exported too.
+
+## HUD and UI (in CorePlugins)
+
+```ts
+export const UpdateHud = system(({ res }) => {
+  const ui = res.mut(Ui)
+  ui.text('score', `Score ${res.get(Score).value}`)                         // top-left by default
+  ui.bar('hp', hp / maxHp, { anchor: 'bottom-left', label: 'HP', color: '#f55' })
+})
+// a menu: buttons emit UiClick; `action` also clicks it from the keyboard/gamepad
+ui.text('menu.title', 'Coin Rush', { anchor: 'center', size: 56 })
+ui.button('menu.start', 'Start', { anchor: 'center', action: 'jump' })
+for (const c of events.read(UiClick)) if (c.id === 'menu.start') res.mut(Screen).set('playing')
+ui.clear('menu.')                                                            // every id with the prefix
+```
+
+Elements are retained data keyed by id: setting the same value again costs nothing, so set them
+every frame if that is simpler. Anchors: `top-left top top-right left center right bottom-left bottom
+bottom-right`; options `size color order visible` (bars: `label width`; buttons: `action`).
+`ui.show(id, false)`, `ui.remove(id)`. Headless the same data exists, so tests assert
+`app.res(Ui).get('score')?.text` and press buttons with `app.res(Ui).click('menu.start')` (UiClick
+arrives on the next step). The DOM is drawn over the canvas, and `kiln shot` includes it.
+
+## Camera (`CameraPlugin`)
+
+```ts
+app.use(CorePlugins, CameraPlugin)
+commands.spawn(Player, ..., CameraTarget)          // or add CameraTarget to the Player prefab
+res.mut(CameraRig).offset = { x: 0, y: 8, z: 10 }  // 3D default 0,10,12; 2D default 0,0,100
+events.emit(CameraShake, { amount: 0.4 })          // from any system; or res.mut(CameraRig).shake(0.4)
+```
+
+`CameraRig` fields: `offset`, `smoothing` (catch-up per second, 0 snaps), `lookAt` (3D), `bounds`
+(`{ minX, maxX, minY, ... }` clamps the focus), `zoom`, shake tuning `maxOffset maxAngle decay`,
+`enabled` (false hands the Camera back to your systems). Shake is trauma²: 0.2 bump, 0.5 hit,
+1 explosion; it decays on its own. Don't also move `res.mut(Camera)` yourself while the rig is enabled.
+
+## Saving (`savePlugin`)
+
+```ts
+app.use(CorePlugins, savePlugin({ key: 'my-game', resources: [Level, Inventory], traits: [IsPlayer, Transform, Health], persist: [Settings, HighScore] }))
+res.mut(Saves).save('slot1')     // writes now, emits Saved
+res.mut(Saves).load('slot1')     // false if missing; applies next frame start, then emits Loaded
+res.get(Saves).has('slot1'), .slots(), .delete('slot1')
+```
+
+- `resources` are written to slots; `traits` picks entities (any entity with one of them) and the
+  values saved for them. Loading replaces those entities and leaves the rest. Three.js objects
+  (`MeshRef`) are not saved: re-add visuals on `Loaded`, or with a system over `[IsCoin, Not(MeshRef)]`.
+- `persist` resources load before Startup and save themselves whenever they change (localStorage in
+  the browser, memory headless). Tests pass `storage: memoryStorage()` to share one store between apps.
 
 ## Physics (`kiln/physics`, Rapier)
 
@@ -282,4 +391,8 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 | `X wrote T.f on the copy entity.get() returns` | write through the row, or `entity.set(T, {...})` with `Mut(T)` |
 | `app.step() ran while an async plugin is still loading` | `await app.ready()` (scenarios do it) |
 | `No trait named "X"` (kiln run) | check `kiln describe`; names come from exports |
+| `TickTimers and X both take Mut(Timer)` | `X.after(TickTimers)` |
+| `'x' is not a value of this state` | use one of the listed values, or add it to `state([...])` |
+| `Saves needs the save plugin` | `.use(savePlugin({ resources, traits, persist }))` |
+| `Ui.click('x'): there is no button 'x'` | the button isn't set yet (step first) or the id differs |
 

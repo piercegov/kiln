@@ -10,7 +10,7 @@ This page records how the implementation maps to it, and where it deliberately d
 | Layer | Where | Imports Three.js? |
 |---|---|---|
 | Core: app, loop, ECS wrap, schedule, events, snapshots | `packages/kiln/src/core` | No (enforced by a test) |
-| Plugins: render, input, assets, debug, physics | `packages/kiln/src/plugins` | render/assets/debug yes; input/physics no |
+| Plugins: render, input, assets, debug, physics, timer, tween, ui, camera, save | `packages/kiln/src/plugins` | render/assets/debug/camera yes; the rest no |
 | Tooling: CLI, Vite plugin, Bun preload, scenario runner | `packages/kiln/src/{cli,tooling,test}` | — |
 | Community plugins (`kiln add`) | `packages/kiln/community` | yes |
 
@@ -35,3 +35,15 @@ This page records how the implementation maps to it, and where it deliberately d
 - **Physics**: Rapier 0.21 compat builds (3D, or 2D in `mode: '2d'`). Deterministic on one machine;
   cross-machine determinism is deferred.
 - **Runtime**: Bun for CLI/tests/scripts, Vite for the browser; core uses no `Bun.*` APIs.
+- **Run conditions** (`runIf(cond, ...items)`) are schedule gates, not system options, so the same
+  system can be gated at the add site like Bevy's `.run_if`. Conditions see `{ res, time }`; their
+  resource reads are recorded for `kiln describe`, which prints them per system.
+- **States** are resources (`state([...], initial)`). Transitions apply in a frame-start hook, once
+  per frame; `onEnter`/`onExit` are conditions true for one frame (one step in Fixed), with the same
+  edge rule as `Input.pressed`. `despawnOnExit` replaces Bevy's `StateScoped`.
+- **Game plugins**: timers, tweens and the UI layer are in CorePlugins (headless, cheap, and silent
+  no-ops when unused, which agents would otherwise trip on); camera and save are opt-in because they
+  take over the camera or need configuration. Timers, Delayed and tweens count fixed steps so they
+  stay deterministic. The UI is retained data in a resource (assertable headless), drawn as DOM over
+  the canvas; `kiln shot` clips the page so the HUD is in the image. Save files hold the chosen
+  resources and trait values only; Three.js objects are rebuilt by the game after `Loaded`.
