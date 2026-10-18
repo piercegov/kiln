@@ -17,6 +17,7 @@
     "./tween": "./src/plugins/tween/index.ts",
     "./ui": "./src/plugins/ui/index.ts",
     "./camera": "./src/plugins/camera/index.ts",
+    "./save": "./src/plugins/save/index.ts",
     "./test": "./src/test/index.ts",
     "./vite": "./src/tooling/vite.ts",
     "./preload": "./src/tooling/preload.ts",
