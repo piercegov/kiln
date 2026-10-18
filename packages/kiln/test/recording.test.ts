@@ -271,6 +271,63 @@ describe('recordings', () => {
     expect(() => new Replayer(other, rec)).toThrow('The recording ran with seed 7 but this app has 99')
   })
 
+  test('pointer lock: raw movement and lock changes replay exactly', async () => {
+    const Aim = resource({ yaw: 0, pitch: 0, lockedFrames: 0, lost: 0, wasLocked: false })
+    const MouseLook = system(({ res }) => {
+      const p = res.get(Input).pointer
+      const a = res.mut(Aim)
+      a.yaw += p.dx * 0.0037
+      a.pitch += p.dy * 0.0021
+      if (p.locked) a.lockedFrames++
+      if (a.wasLocked && !p.locked) a.lost++
+      a.wasLocked = p.locked
+    })
+    const make = game((a) => a.init(Aim).add(Update, MouseLook))
+    const live = await scenarioApp({ app: make, startup: false }, root)
+    const recorder = new Recorder(live, { checkEvery: 10 })
+    live.boot()
+    const raw = live.ext.rawInput as RawInput
+    raw.pointer.x = 200
+    raw.pointer.y = 150
+    for (let f = 1; f <= 90; f++) {
+      if (f === 5) raw.pointer.locked = true
+      // Under lock the cursor freezes and only movement arrives, in uneven steps.
+      if (raw.pointer.locked && f % 2 === 0) {
+        raw.pointer.dx += 1.3 + (f % 7) * 0.1
+        raw.pointer.dy -= 0.7
+      }
+      if (f === 60) raw.pointer.locked = false // Escape
+      if (f === 70) {
+        raw.pointer.dx += 33 // unlocked: movement is the position change
+        raw.pointer.x += 33
+      }
+      live.tick(f % 3 ? 1 / 60 : 1 / 45)
+    }
+    const rec: Recording = JSON.parse(JSON.stringify(recorder.stop()))
+    expect(live.res(Aim).lost).toBe(1)
+    expect(rec.input).toContainEqual(expect.objectContaining({ pointer: expect.objectContaining({ locked: true }) }))
+    expect(rec.input.some((e) => 'pointer' in e && e.pointer.dx !== undefined)).toBe(true)
+    const { app, result } = await replayApp(rec, { app: make }, root)
+    apps.push(app)
+    expect(result.divergedAt).toBeNull()
+    expect(app.res(Aim)).toEqual(live.res(Aim))
+  })
+
+  test('scripted pointer movement and lock without a position', () => {
+    const app = game()()
+    app.boot()
+    app.input.script([
+      { frame: 1, pointer: { dx: 5, dy: -2, locked: true } },
+      { frame: 3, pointer: { locked: false } },
+    ])
+    app.step(1)
+    expect(app.res(Input).pointer).toMatchObject({ x: 0, y: 0, dx: 5, dy: -2, locked: true })
+    app.step(1)
+    expect(app.res(Input).pointer).toMatchObject({ dx: 0, dy: 0, locked: true })
+    app.step(1)
+    expect(app.res(Input).pointer.locked).toBe(false)
+  })
+
   test('input record() still emits plain press/release for keys', async () => {
     const app = game()()
     app.boot()

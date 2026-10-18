@@ -8,6 +8,9 @@
  *   'keep' and false reload the page.
  * - `/__kiln/shot` serves the page `kiln shot` screenshots.
  * - `POST /__kiln/recording?name=x` writes a session recording (F8 in the game) to recordings/x.json.
+ * - Dedupes three and koota, so a game that installs kiln from outside its own node_modules (a
+ *   file: or linked checkout) still shares one copy with it. Two copies of three break WebGPU
+ *   lights ("Light node not found"); two copies of koota split traits between worlds.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -60,6 +63,9 @@ export function kiln(options: KilnViteOptions = {}): Plugin {
   return {
     name: 'kiln',
     enforce: 'pre',
+    config() {
+      return { resolve: { dedupe: ['three', 'koota'] } }
+    },
     configResolved(c) {
       root = c.root
       entryAbs = resolve(root, entry)

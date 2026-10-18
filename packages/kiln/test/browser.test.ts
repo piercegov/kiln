@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import { $ } from 'bun'
 import { existsSync, rmSync } from 'node:fs'
-import { factoryKinds } from '../src/tooling/vite.ts'
+import { resolveConfig } from 'vite'
+import { factoryKinds, kiln } from '../src/tooling/vite.ts'
+import { shotPlan } from '../src/cli/shot.ts'
+import { parseArgs } from '../src/cli/args.ts'
 import { addNames } from '../src/tooling/names.ts'
 
 describe('vite plugin', () => {
@@ -25,9 +28,25 @@ describe('vite plugin', () => {
     expect(out).toContain('const R = /\\)/.test')
     expect(() => new Function(out.replace(/export /g, '').replace(/<\{ a: number \}>/, ''))).not.toThrow()
   })
+
+  test('dedupes three and koota, so a linked kiln shares them with the game', async () => {
+    const config = await resolveConfig({ configFile: false, logLevel: 'silent', plugins: [kiln()] }, 'serve')
+    expect(config.resolve.dedupe).toEqual(expect.arrayContaining(['three', 'koota']))
+  })
 })
 
 describe('kiln shot', () => {
+  const scene = `${import.meta.dir}/fixtures/scene`
+  test('--setup, --input and --recording become the page plan, with errors that name the fix', () => {
+    const plan = shotPlan(parseArgs(['--setup', 'shots/advance.ts', '--input', '[{"frame":1,"tap":"jump"}]']), scene)
+    expect(plan.setup).toBe(`/@fs/${`${scene}/shots/advance.ts`.replace(/^\/+/, '')}`)
+    expect(plan.input).toEqual([{ frame: 1, tap: 'jump' }])
+    expect(() => shotPlan(parseArgs(['--setup', 'nope.ts']), scene)).toThrow('default export is (app) => void')
+    expect(() => shotPlan(parseArgs(['--input', '{"frame":1}']), scene)).toThrow('a JSON array')
+    expect(() => shotPlan(parseArgs(['--recording', 'kiln.config.ts']), scene)).toThrow()
+    expect(() => shotPlan(parseArgs(['--recording', '{"kiln":"x"}']), scene)).toThrow('not a Kiln recording')
+  })
+
   test(
     'renders a frame in headless Chromium',
     async () => {
@@ -40,6 +59,25 @@ describe('kiln shot', () => {
       expect(['webgpu', 'webgl2']).toContain(res.backend)
       expect(existsSync(out)).toBe(true)
       expect(Bun.file(out).size).toBeGreaterThan(2000)
+      rmSync(out, { force: true })
+    },
+    90_000,
+  )
+
+  test(
+    'runs a setup module and an input script before the steps',
+    async () => {
+      const out = `${import.meta.dir}/../.shot-setup-test.png`
+      rmSync(out, { force: true })
+      const input = '[{"frame":1,"tap":"jump"}]'
+      const r = await $`bun src/cli/kiln.ts shot --json --steps 30 --setup shots/advance.ts --input ${input} --cwd test/fixtures/scene ${out}`
+        .cwd(`${import.meta.dir}/..`)
+        .nothrow()
+        .quiet()
+      const res = JSON.parse(r.stdout.toString().trim().split('\n').pop()!)
+      expect(res.errors).toEqual([])
+      expect(res.ok).toBe(true)
+      expect(res.tick).toBe(35) // 5 from the setup module, 30 from --steps
       rmSync(out, { force: true })
     },
     90_000,

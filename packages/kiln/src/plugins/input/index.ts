@@ -49,7 +49,7 @@ export class RawInput {
   /** Analog values for gamepad bindings ('Pad:A' → 1, 'Pad:LX+' → 0.7). */
   pad = new Map<string, number>()
   stick = { x: 0, y: 0, active: false }
-  pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, inside: false }
+  pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, inside: false, locked: false }
   /** Gamepads seen via gamepadconnected. Polling skips navigator.getGamepads() while this is 0. */
   pads = 0
   clear(): void {
@@ -70,8 +70,17 @@ export class RawInput {
 export class InputState {
   /** Move axis from left/right/up/down (or the left stick). Unit length at most. */
   readonly axis = { x: 0, y: 0 }
-  /** Pointer in canvas pixels and normalized device coords (y up), plus deltas this frame. */
-  readonly pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, down: false }
+  /**
+   * Pointer in canvas pixels and normalized device coords (y up), plus deltas this frame. While
+   * `locked` (pointer lock), x/y stay put and dx/dy carry the raw mouse movement, for mouse look.
+   */
+  readonly pointer = { x: 0, y: 0, ndcX: 0, ndcY: 0, dx: 0, dy: 0, wheel: 0, down: false, locked: false }
+  /**
+   * Set true to capture the mouse for mouse look: Kiln requests pointer lock on the canvas (now if
+   * the page has a recent click, else on the next click into the canvas) and exits it when set back
+   * to false. Read whether the lock is held from `pointer.locked`; the browser can drop it (Escape).
+   */
+  pointerLock = false
   values = new Map<string, number>()
   downSet = new Set<string>()
   framePressed = new Set<string>()
@@ -97,7 +106,7 @@ export class InputState {
     return this.values.get(action) ?? 0
   }
   toJSON() {
-    return { axis: { ...this.axis }, down: [...this.downSet].sort() }
+    return { axis: { ...this.axis }, down: [...this.downSet].sort(), ...(this.pointer.locked ? { locked: true } : {}) }
   }
 }
 
@@ -149,10 +158,15 @@ class Controller implements InputController {
       else if ('pointer' in ev) {
         this.at(ev.frame, () => {
           const p = this.raw.pointer
-          p.dx += ev.pointer.x - p.x
-          p.dy += ev.pointer.y - p.y
-          p.x = ev.pointer.x
-          p.y = ev.pointer.y
+          const e = ev.pointer
+          const x = e.x ?? p.x
+          const y = e.y ?? p.y
+          // Explicit dx/dy are the frame's movement (locked mouse look); otherwise the position change is.
+          p.dx += e.dx ?? x - p.x
+          p.dy += e.dy ?? y - p.y
+          p.x = x
+          p.y = y
+          if (e.locked !== undefined) p.locked = e.locked
           if (ev.pointer.ndcX !== undefined) p.ndcX = ev.pointer.ndcX
           if (ev.pointer.ndcY !== undefined) p.ndcY = ev.pointer.ndcY
           if (ev.pointer.wheel) p.wheel += ev.pointer.wheel
@@ -200,7 +214,7 @@ class Controller implements InputController {
       events: [],
       values: new Map(),
       axis: null,
-      pointer: { x: 0, y: 0, ndcX: 0, ndcY: 0, mouse: false },
+      pointer: { x: 0, y: 0, ndcX: 0, ndcY: 0, mouse: false, locked: false },
     }
     this.recording = rec
     return {
@@ -244,12 +258,21 @@ class Controller implements InputController {
     const p = state.pointer
     const lp = rec.pointer
     const mouse = this.raw.keys.has('Mouse0') || this.raw.tapped.has('Mouse0') || this.virtualKeys.has('Mouse0')
-    if (p.x !== lp.x || p.y !== lp.y || p.ndcX !== lp.ndcX || p.ndcY !== lp.ndcY || p.wheel !== 0 || mouse !== lp.mouse) {
+    // Movement the position change doesn't account for (pointer lock): recorded as dx/dy so replay
+    // gives the game the same numbers.
+    const moved = p.dx !== p.x - lp.x || p.dy !== p.y - lp.y
+    const posChanged = p.x !== lp.x || p.y !== lp.y || p.ndcX !== lp.ndcX || p.ndcY !== lp.ndcY
+    if (posChanged || moved || p.wheel !== 0 || mouse !== lp.mouse || p.locked !== lp.locked) {
       const pointer: Extract<ScriptEvent, { pointer: unknown }>['pointer'] = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY }
+      if (moved) {
+        pointer.dx = p.dx
+        pointer.dy = p.dy
+      }
       if (mouse !== lp.mouse) pointer.down = mouse
       if (p.wheel !== 0) pointer.wheel = p.wheel
+      if (p.locked !== lp.locked) pointer.locked = p.locked
       ev.push({ frame, pointer })
-      rec.pointer = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY, mouse }
+      rec.pointer = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY, mouse, locked: p.locked }
     }
   }
 }
@@ -259,7 +282,7 @@ interface Recording {
   events: ScriptEvent[]
   values: Map<string, number>
   axis: { x: number; y: number } | null
-  pointer: { x: number; y: number; ndcX: number; ndcY: number; mouse: boolean }
+  pointer: { x: number; y: number; ndcX: number; ndcY: number; mouse: boolean; locked: boolean }
 }
 
 /** Map/Set.clear() allocates a fresh table even when empty, so skip it when there is nothing to clear. */
@@ -331,7 +354,13 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     p.ndcX = (x / rect.width) * 2 - 1
     p.ndcY = -((y / rect.height) * 2 - 1)
   }
-  const onMove = (e: PointerEvent) => pos(e)
+  const onMove = (e: PointerEvent) => {
+    // Under pointer lock the cursor position freezes; movementX/Y carry the motion.
+    if (raw.pointer.locked) {
+      raw.pointer.dx += e.movementX
+      raw.pointer.dy += e.movementY
+    } else pos(e)
+  }
   const onDown = (e: PointerEvent) => {
     pos(e)
     raw.keys.add(`Mouse${e.button}`)
@@ -342,6 +371,27 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     raw.pointer.wheel += e.deltaY
   }
   const onContext = (e: Event) => e.preventDefault()
+  const lockTarget = canvas ?? document.body
+  const onLockChange = () => {
+    raw.pointer.locked = document.pointerLockElement === lockTarget
+  }
+  // Pointer lock follows Input.pointerLock: requested when it turns on (works if the page has a
+  // recent click) and again on each click into the canvas while it is on; exited when it turns off.
+  let wanted = false
+  const requestLock = () => {
+    const r = (lockTarget as HTMLElement).requestPointerLock?.() as Promise<void> | undefined
+    r?.catch?.(() => {})
+  }
+  const onLockClick = () => {
+    if (app.resource(Input).pointerLock && !raw.pointer.locked) requestLock()
+  }
+  const syncLock = () => {
+    const want = app.resource(Input).pointerLock
+    if (want && !wanted && !raw.pointer.locked) requestLock()
+    else if (!want && document.pointerLockElement === lockTarget) document.exitPointerLock()
+    wanted = want
+  }
+  app.hooks.frameEnd.push(syncLock)
   const onPadOn = () => raw.pads++
   const onPadOff = () => {
     raw.pads = Math.max(0, raw.pads - 1)
@@ -358,8 +408,14 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
   canvas?.addEventListener('contextmenu', onContext)
   window.addEventListener('gamepadconnected', onPadOn)
   window.addEventListener('gamepaddisconnected', onPadOff)
-  void app
+  document.addEventListener('pointerlockchange', onLockChange)
+  lockTarget.addEventListener('pointerdown', onLockClick)
   return () => {
+    const i = app.hooks.frameEnd.indexOf(syncLock)
+    if (i >= 0) app.hooks.frameEnd.splice(i, 1)
+    if (document.pointerLockElement === lockTarget) document.exitPointerLock()
+    document.removeEventListener('pointerlockchange', onLockChange)
+    lockTarget.removeEventListener('pointerdown', onLockClick)
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('blur', onBlur)
@@ -459,6 +515,7 @@ export function inputPlugin(options: InputOptions = {}): Plugin {
         p.dx = rp.dx
         p.dy = rp.dy
         p.wheel = rp.wheel
+        p.locked = rp.locked
         p.down = nextDown.has('fire') || raw.keys.has('Mouse0') || ctl.virtualKeys.has('Mouse0')
         rp.dx = 0
         rp.dy = 0

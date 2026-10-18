@@ -5,9 +5,9 @@ import { trait } from '../../core/koota.ts'
 import { plugin } from '../../core/plugin.ts'
 import { resource } from '../../core/resource.ts'
 import { Render, Update } from '../../core/schedule.ts'
-import { system, type System } from '../../core/system.ts'
+import { system } from '../../core/system.ts'
 import { ChildOf, Transform } from '../../core/transform.ts'
-import { Camera } from '../render/index.ts'
+import { Camera, Draw, RenderSync } from '../render/index.ts'
 import { MeshRef } from '../render/traits.ts'
 
 /** Tag: the camera rig follows this entity (the first one, if several). */
@@ -164,8 +164,7 @@ const _delta = new THREE.Vector3()
 export const CameraPlugin = plugin((app) => {
   app.init(CameraRig, CameraShake)
   app.add(Update, CameraRigUpdate)
-  const rs = app.ext.renderSystems as { RenderSync: System; Draw: System } | undefined
-  if (!rs) return
+  if (!app.ext.renderOptions) return // no render plugin, nothing to interpolate
   /**
    * Gameplay moves in fixed steps and the render interpolates between them; this shifts the camera
    * by the target's interpolation offset just before drawing so the target doesn't jitter.
@@ -191,5 +190,5 @@ export const CameraPlugin = plugin((app) => {
     },
     { name: 'CameraRigInterpolate', unchecked: true },
   )
-  app.add(Render, CameraRigInterpolate.after(rs.RenderSync).before(rs.Draw))
+  app.add(Render, CameraRigInterpolate.after(RenderSync).before(Draw))
 }, 'CameraPlugin')

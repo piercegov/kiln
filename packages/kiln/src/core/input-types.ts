@@ -12,10 +12,24 @@ export type ScriptEvent = { frame: number } & (
   /** Override the move axis; null hands it back to the devices. */
   | { axis: { x: number; y: number } | null }
   /**
-   * Pointer position in canvas pixels, optionally with the primary button state, normalized device
-   * coords (recordings carry them; scripts can leave them out) and a wheel delta for that frame.
+   * Pointer position in canvas pixels (left out: it stays where it was), optionally with the primary
+   * button state, normalized device coords (recordings carry them; scripts can leave them out), a
+   * wheel delta, `dx`/`dy` movement for that frame (mouse look under pointer lock; without them the
+   * movement is the position change) and `locked` (pointer lock taken or lost).
    */
-  | { pointer: { x: number; y: number; down?: boolean; ndcX?: number; ndcY?: number; wheel?: number } }
+  | {
+      pointer: {
+        x?: number
+        y?: number
+        dx?: number
+        dy?: number
+        locked?: boolean
+        down?: boolean
+        ndcX?: number
+        ndcY?: number
+        wheel?: number
+      }
+    }
 )
 
 /** What `app.input` exposes. Implemented by the input plugin. */

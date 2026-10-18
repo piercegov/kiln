@@ -91,12 +91,38 @@ Prints `file:line:col rule message` per finding and exits 1 if there are any. A 
 ## shot
 
 ```bash
-kiln shot [--steps N] [--seed S] [--width W] [--height H] [--webgl] [--timeout ms] [out.png]
+kiln shot [--steps N] [--seed S] [--setup file.ts] [--input script.json] [--recording rec.json [--until N]]
+          [--width W] [--height H] [--webgl] [--timeout ms] [out.png]
 ```
 
 Serves the game with Vite, opens it in headless Chromium, waits for Startup's asset loads, runs `N`
 fixed steps (default 60), renders one frame and saves it (default `shot.png`, 800×600). The image is
 clipped to the canvas from the page, so the HUD is included.
+
+To shoot something other than the opening screen, in the order they run:
+
+| Flag | |
+|---|---|
+| `--recording rec.json` | Replays a [recording](../testing/recordings) from boot, up to frame `--until N` (default: its end). `--steps` defaults to 0 after it, so the shot is the recorded frame |
+| `--setup file.ts` | A module whose default export runs on the started app: `(app) => void \| Promise<void>` (type `ShotSetup` from `kiln/browser`). Spawn things, set states and resources, script input, `app.step(n)` |
+| `--input script` | An [input script](../plugins/input#scripted-input), as a JSON file or inline (`'[{"frame":1,"tap":"jump"}]'`), queued before the steps |
+
+```ts
+// shots/boss.ts
+import type { ShotSetup } from 'kiln/browser'
+import { Score } from '../src/data.ts'
+
+const setup: ShotSetup = (app) => {
+  app.resource(Score).value = 9000
+  app.input.tap('pause')      // or app.spawn(...), app.step(30)
+}
+export default setup
+```
+
+```bash
+kiln shot --setup shots/boss.ts --input '[{"frame":1,"hold":"right","frames":40}]' boss.png
+kiln shot --recording recordings/x.json --until 300 bug.png
+```
 
 Prints `ok out.png tick=60 backend=webgpu`, followed by any `console-error` and `console-warning`
 lines from the page. `--webgl` forces the WebGL2 backend.

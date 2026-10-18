@@ -79,6 +79,18 @@ Move the camera from an `Update` system, or let the [camera rig](./camera) do it
 a 60° perspective camera at `(0, 10, 14)` looking at the origin, with a hemisphere light and a
 directional light in the scene.
 
+## Ordering Render-phase work
+
+The render plugin's systems run in `Render`: `RenderSync` (copies interpolated transforms to the
+objects), `InstanceSync`, then `Draw`. A camera or posing system that reads interpolated positions
+and must land in this frame's draw goes between them:
+
+```ts
+import { Draw, Render, RenderSync } from 'kiln'
+
+app.add(Render, FollowCamera.after(RenderSync).before(Draw))
+```
+
 ## Options
 
 `renderPlugin({ ... })` in place of `RenderPlugin`:

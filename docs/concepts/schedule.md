@@ -86,7 +86,7 @@ Plugins add their own systems. The ones you are most likely to order against:
 | `AnimateSprites` / `AnimateModels` | Fixed | `.before(...)` when setting animation params |
 | `CreateBodies` … `WriteBackTransforms` | Fixed | `.before(CreateBodies)` to drive bodies, `.after(WriteBackTransforms)` to react |
 | `CameraRigUpdate` | Update | — |
-| `RenderSync`, `Draw` | Render | — |
+| `RenderSync`, `InstanceSync`, `Draw` | Render | `.after(RenderSync).before(Draw)` for cameras and posing that need interpolated positions |
 
 `kiln describe` lists every plugin system with its access, so the full list is always one command
 away.

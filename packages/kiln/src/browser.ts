@@ -3,13 +3,21 @@
  * canvas, shows Kiln errors in an overlay, and handles hot reload.
  */
 import type { App } from './core/app.ts'
+import { KilnError } from './core/errors.ts'
 import { isSystem, type System } from './core/system.ts'
 import { PHASES } from './core/schedule.ts'
 import type { Snapshot } from './core/snapshot.ts'
-import { Recorder, type Recording } from './core/recording.ts'
+import { Recorder, Replayer, type Recording } from './core/recording.ts'
+import type { ScriptEvent } from './core/input-types.ts'
 import { Renderer } from './plugins/render/index.ts'
 
 export type MainFn = () => App | Promise<App>
+
+/**
+ * A `kiln shot --setup` module's default export. It runs on the started app after Startup (and
+ * after a --recording replay), before --input and the steps: spawn things, set state, script input.
+ */
+export type ShotSetup = (app: App) => void | Promise<void>
 
 declare global {
   // eslint-disable-next-line no-var
@@ -196,8 +204,9 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
 }
 
 /**
- * The page `kiln shot` loads: build headlessly-deterministic, step N frames, render one frame,
- * then signal Playwright. Params come from the query string: steps, seed, webgl.
+ * The page `kiln shot` loads: build headlessly-deterministic, replay a recording, run a setup
+ * module, queue an input script, step N frames, render one frame, then signal Playwright. Params
+ * come from the query string (steps, seed, webgl) and window.__KILN_SHOT__ (setup, input, recording).
  */
 export async function shot(main: MainFn, canvas: HTMLCanvasElement): Promise<void> {
   const q = new URLSearchParams(location.search)
@@ -207,16 +216,38 @@ export async function shot(main: MainFn, canvas: HTMLCanvasElement): Promise<voi
   canvas.style.width = `${w}px`
   canvas.style.height = `${h}px`
   const g = window as any
+  const plan = (g.__KILN_SHOT__ ?? {}) as { setup?: string; input?: ScriptEvent[]; recording?: Recording; until?: number }
   try {
-    if (q.has('seed')) g.__KILN_OVERRIDES__ = { seed: Number(q.get('seed')) }
+    if (plan.recording) {
+      const { seed, fixedHz, maxFrameDt, maxFixedSteps, mode } = plan.recording.config
+      g.__KILN_OVERRIDES__ = { seed, fixedHz, maxFrameDt, maxFixedSteps, mode }
+    } else if (q.has('seed')) g.__KILN_OVERRIDES__ = { seed: Number(q.get('seed')) }
     const app = await main()
     g.__kiln_app = app
+    // A replay boots the app itself (from the recording's start state), so it comes before start().
+    const replayer = plan.recording ? (await app.ready(), new Replayer(app, plan.recording)) : null
     await app.start(canvas, { loop: false })
     // Assets requested in Startup load before the steps, as in scenarios, so the frame is deterministic.
     await app.idle()
     // Simulate without drawing, then draw once: the renderer uploads some per-frame data (instance
     // colours) only once per browser frame, so many renders in one frame would lose updates.
     app.headless = true
+    if (replayer) {
+      const r = await replayer.play(plan.until)
+      for (const n of r.notes) console.warn(`[kiln] ${n}`)
+      if (r.divergedAt !== null) console.warn(`[kiln] replay stopped matching the recording at frame ${r.divergedAt}`)
+      // Done replaying: loads from setup and the steps land as they would live.
+      app.ext.replay = undefined
+    }
+    if (plan.setup) {
+      const mod = (await import(/* @vite-ignore */ plan.setup)) as { default?: ShotSetup }
+      if (typeof mod.default !== 'function') {
+        throw new KilnError('shot-setup', `kiln shot --setup ${plan.setup.replace(/^\/@fs/, '')} has no default export. Export default (app) => { ... }.`)
+      }
+      await mod.default(app)
+      await app.idle()
+    }
+    if (plan.input) app.input.script(plan.input)
     app.step(steps)
     app.headless = false
     // Assets requested during the steps (sprite sheets, models) land before the one draw.

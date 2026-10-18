@@ -25,10 +25,37 @@ export const PlayerMove = system([Mut(Velocity), IsPlayer], ([v], { res }) => {
 | `pressed(a)` | True on the step (in `Fixed`) or frame (elsewhere) it went down |
 | `released(a)` | True on the step or frame it went up |
 | `value(a)` | Analog value 0..1 (triggers, stick directions); 0 or 1 for keys |
-| `pointer` | `x, y` (canvas pixels), `ndcX, ndcY` (−1..1, y up), `dx, dy`, `wheel`, `down` |
+| `pointer` | `x, y` (canvas pixels), `ndcX, ndcY` (−1..1, y up), `dx, dy`, `wheel`, `down`, `locked` |
+| `pointerLock` | Set to `true` to capture the mouse ([mouse look](#mouse-look-and-pointer-lock)) |
 
 `pressed` and `released` are edge-triggered exactly once: once per press in `Fixed`, however many
 steps a frame runs, and once per frame elsewhere. A press and release inside one frame still counts.
+
+## Mouse look and pointer lock
+
+Set `pointerLock` on the `Input` resource to capture the mouse while the game wants it:
+
+```ts
+export const CaptureMouse = system(({ res }) => {
+  res.mut(Input).pointerLock = res.get(Screen).is('playing')
+})
+
+export const MouseLook = system([Mut(Aim)], ([aim], { res }) => {
+  const p = res.get(Input).pointer
+  if (!p.locked) return
+  aim.yaw -= p.dx * 0.002
+  aim.pitch -= p.dy * 0.002
+})
+```
+
+While `pointerLock` is true, Kiln requests pointer lock on the canvas: at once when the page has a
+recent click (a Start button), and otherwise on the next click into the canvas. Setting it back to
+false releases the mouse, so menus get a cursor. The browser can drop the lock on its own (Escape,
+switching tabs); `pointer.locked` follows the real state, so a game can pause when it goes false.
+
+While locked, the cursor position (`x`, `y`) stays put and `dx`, `dy` carry the raw mouse movement.
+Both `locked` and the movement are recorded, so mouse-look sessions [replay](../testing/recordings)
+frame for frame.
 
 ## Actions
 
@@ -66,6 +93,7 @@ app.input.script([
   { frame: 60, axis: { x: 0, y: 1 } },       // override the move axis; null hands it back
   { frame: 70, key: 'KeyE' },                // a raw key through the action map ({ key, up: true } releases)
   { frame: 80, pointer: { x: 400, y: 300, down: true } },
+  { frame: 90, pointer: { dx: 12, dy: -3, locked: true } },  // locked mouse look: movement, no position
 ])
 ```
 

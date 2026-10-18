@@ -26,8 +26,10 @@ commands
                                      replay a recorded session (F8 in the dev server) headless;
                                      prints where it stopped matching and the end snapshot
   check [--json]                     determinism lint for src/
-  shot [--steps N] [--seed S] [--width W] [--height H] out.png
-                                     one rendered frame from headless Chromium
+  shot [--steps N] [--seed S] [--setup file.ts] [--input script.json] [--recording rec.json [--until N]]
+       [--width W] [--height H] out.png
+                                     one rendered frame from headless Chromium, after an optional
+                                     replay, setup module (default export (app) => void) and input script
   add <plugin> [--list] [--force]    copy a community plugin into src/plugins/
   docs [--check]                     write AGENTS.md: the Kiln guide plus this game's schedule and JSDoc
   new <dir>                          create a game from the template

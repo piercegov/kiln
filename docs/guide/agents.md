@@ -16,6 +16,7 @@ kiln replay recordings/x.json        # replay a play session the user recorded (
 kiln run --steps 600 --snapshot Transform,Health --resources Score   # JSON world after N steps
 kiln check               # determinism lint (Math.random, Date.now, performance.now)
 kiln shot --steps 120 out.png        # one rendered frame from headless Chromium, when you need eyes
+kiln shot --setup shots/boss.ts --input '[{"frame":1,"hold":"right","frames":30}]' boss.png   # past the title screen
 kiln docs                # regenerate AGENTS.md
 kiln add <plugin>        # vendor a community plugin into src/plugins/ (kiln add --list)
 ```

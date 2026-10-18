@@ -55,7 +55,9 @@ export default defineConfig({ plugins: [kiln()] })
 ```
 
 It applies the names transform, wires hot reload, serves the page `kiln shot` renders, and accepts
-recordings from F8. Pass `kiln({ entry })` if the entry isn't `src/main.ts`.
+recordings from F8. It also dedupes `three` and `koota`, so a game that uses kiln from a checkout
+(`file:` or linked) still has one copy of each; two copies of three make WebGPU drop the game's
+lights ("Light node not found"). Pass `kiln({ entry })` if the entry isn't `src/main.ts`.
 
 ## Bun
 

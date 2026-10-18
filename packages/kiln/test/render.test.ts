@@ -8,8 +8,11 @@ import {
   createApp,
   CorePlugins,
   Fixed,
+  Draw,
   MeshRef,
   Mut,
+  Render,
+  RenderSync,
   Scene,
   setEuler,
   SharedMesh,
@@ -81,6 +84,22 @@ describe('RenderSync', () => {
     expect(mesh.position.x).toBeCloseTo(0.5, 5)
     app.tick(0.03)
     expect(mesh.position.x).toBeCloseTo(0.8, 5)
+  })
+
+  test('Render-phase systems ordered between RenderSync and Draw see interpolated objects', async () => {
+    const app = mk({ fixedHz: 10 }).add(Fixed, Movement)
+    const mesh = box()
+    app.spawn(Transform, Velocity({ x: 10 }), MeshRef(mesh))
+    const seen: number[] = []
+    const Follow = system(() => void seen.push(mesh.position.x), { name: 'Follow' })
+    app.add(Render, Follow.after(RenderSync).before(Draw))
+    await app.start(undefined, { loop: false })
+    app.tick(0.1)
+    app.tick(0.05)
+    expect(seen.at(-1)).toBeCloseTo(0.5, 5)
+    const order = app.systemsIn(Render).map((s) => s.name)
+    expect(order.indexOf('Follow')).toBeGreaterThan(order.indexOf('RenderSync'))
+    expect(order.indexOf('Follow')).toBeLessThan(order.indexOf('Draw'))
   })
 
   test('Teleported snaps instead of interpolating', async () => {

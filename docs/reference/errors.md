@@ -93,6 +93,7 @@ system's name and phase in the message and the original as `cause`.
 |---|---|
 | `asset-missing` | A path that isn't in `public/` |
 | `unknown-instanced` | `Instanced(key)` with no `defineInstanced(key, ...)` |
+| `no-render-plugin` | `RenderSync` scheduled in an app without the render plugin |
 | `physics-not-ready` | Physics used before the plugin loaded |
 | `no-body` | A `Physics` call on an entity without a body (bodies appear the step after `RigidBody` is added) |
 
@@ -127,5 +128,6 @@ system's name and phase in the message and the original as `cause`.
 | `bad-script` | A malformed input script event |
 | `no-recording` | `kiln replay` without a file, or with a missing one |
 | `no-chromium` | `kiln shot` can't find a browser |
+| `shot-file`, `shot-setup`, `shot-seed` | `kiln shot` with a missing `--setup`/`--input`/`--recording` file, a setup module without a default export, or `--seed` alongside `--recording` |
 | `unknown-plugin`, `plugin-exists` | `kiln add` with an unknown name, or over an existing folder |
 | `missing-dir`, `not-empty` | `kiln new` without a folder, or into a non-empty one |

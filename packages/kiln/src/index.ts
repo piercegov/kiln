@@ -39,7 +39,7 @@ export type { Snapshot, SnapshotDiff, SnapshotOptions, EntitySnapshot, FieldChan
 export type { ScriptEvent, InputController } from './core/input-types.ts'
 export { Recorder, Replayer, stateHash, asRecording, noteChannel, replayChannel, recordStartState, isReplaying } from './core/recording.ts'
 export type { Recording, RecorderOptions, ReplayResult, ChannelEvent } from './core/recording.ts'
-export { RenderPlugin, renderPlugin, Scene, Camera, Renderer, MeshRef, SharedMesh, Teleported, Instanced, InstanceColor, defineInstanced, objectOf } from './plugins/render/index.ts'
+export { RenderPlugin, renderPlugin, RenderSync, InstanceSync, Draw, Scene, Camera, Renderer, MeshRef, SharedMesh, Teleported, Instanced, InstanceColor, defineInstanced, objectOf } from './plugins/render/index.ts'
 export type { RenderOptions, RendererState, InstancedDefinition } from './plugins/render/index.ts'
 export { InputPlugin, inputPlugin, Input, InputState, ActionMap, DEFAULT_ACTIONS } from './plugins/input/index.ts'
 export type { ActionBindings, Binding, InputOptions } from './plugins/input/index.ts'

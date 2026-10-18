@@ -132,6 +132,44 @@ function disposeObject(root: THREE.Object3D): void {
   })
 }
 
+/** This app's render state behind the exported systems. The plugin inserts it. */
+const RenderWork = resource(
+  (): { sync(alpha: number): void; instances(alpha: number): void } => ({
+    sync() {
+      throw new KilnError('no-render-plugin', 'RenderSync ran in an app without the render plugin. Add RenderPlugin (CorePlugins includes it) before scheduling against it.')
+    },
+    instances() {},
+  }),
+  { readonlyProxy: false },
+).named('RenderWork')
+
+/**
+ * Copies interpolated Transforms to Three.js objects (Render phase). Order Render-phase work that
+ * needs interpolated positions after it: `app.add(Render, FollowCamera.after(RenderSync).before(Draw))`.
+ */
+export const RenderSync = system(({ res, time }) => res.get(RenderWork).sync(time.alpha), {
+  name: 'RenderSync',
+  reads: [Transform, MeshRef],
+  unchecked: true,
+})
+
+/** Writes Instanced entities' interpolated transforms into their shared InstancedMesh (Render phase, after RenderSync). */
+export const InstanceSync = system(({ res, time }) => res.get(RenderWork).instances(time.alpha), {
+  name: 'InstanceSync',
+  reads: [Transform, Instanced, InstanceColor],
+  unchecked: true,
+})
+
+/** Draws the scene (last of the render plugin's Render-phase systems). Run camera and posing work `.before(Draw)`. */
+export const Draw = system(
+  ({ res }) => {
+    const r = res.get(Renderer)
+    if (!r.renderer) return
+    r.renderer.render(res.get(Scene), res.get(Camera))
+  },
+  { name: 'Draw' },
+)
+
 /** Builds a render plugin with options. */
 export function renderPlugin(options: RenderOptions = {}): Plugin {
   return plugin((app) => {
@@ -244,25 +282,21 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       return m
     }
 
-    /** Copies interpolated Transforms to Three.js objects. One loop, no per-entity closures. */
-    const RenderSync = system(
-      ({ time }) => {
-        const alpha = time.alpha
-        const ents = world.query(MeshRef, Transform)
-        cacheFrame = -1
-        worldCache.clear()
-        for (let i = 0; i < ents.length; i++) {
-          const e = ents[i]!
-          const obj = objects.get((e as number) & ENTITY_ID_MASK)
-          if (!obj) continue
-          if (e.targetFor(ChildOf) !== undefined) {
-            worldMatrix(e, alpha).decompose(obj.position, obj.quaternion, obj.scale)
-          } else writeTransform(e, obj, alpha)
-        }
-        cacheFrame = app.time.frame
-      },
-      { name: 'RenderSync', reads: [Transform, MeshRef], unchecked: true },
-    )
+    // RenderSync: copies interpolated Transforms to Three.js objects. One loop, no per-entity closures.
+    const sync = (alpha: number) => {
+      const ents = world.query(MeshRef, Transform)
+      cacheFrame = -1
+      worldCache.clear()
+      for (let i = 0; i < ents.length; i++) {
+        const e = ents[i]!
+        const obj = objects.get((e as number) & ENTITY_ID_MASK)
+        if (!obj) continue
+        if (e.targetFor(ChildOf) !== undefined) {
+          worldMatrix(e, alpha).decompose(obj.position, obj.quaternion, obj.scale)
+        } else writeTransform(e, obj, alpha)
+      }
+      cacheFrame = app.time.frame
+    }
 
     // ---- Instancing: one InstancedMesh per key, matrices rewritten each frame.
     const instMeshes = new Map<string, { mesh: THREE.InstancedMesh; count: number; colored: boolean }>()
@@ -305,58 +339,45 @@ export function renderPlugin(options: RenderOptions = {}): Plugin {
       instMeshes.clear()
     })
 
-    /** Writes Instanced entities' interpolated transforms into their shared InstancedMesh. */
-    const InstanceSync = system(
-      ({ time }) => {
-        const ents = world.query(Instanced, Transform)
-        for (const r of instMeshes.values()) r.count = 0
-        if (ents.length > 0) {
-          const keys = getStore(world, Instanced) as string[]
-          counts.clear()
-          for (let i = 0; i < ents.length; i++) {
-            const k = keys[(ents[i]! as number) & ENTITY_ID_MASK]!
-            counts.set(k, (counts.get(k) ?? 0) + 1)
-          }
-          for (const [k, n] of counts) instMesh(k, n)
-          for (let i = 0; i < ents.length; i++) {
-            const e = ents[i]!
-            const rec = instMeshes.get(keys[(e as number) & ENTITY_ID_MASK]!)!
-            if (e.targetFor(ChildOf) !== undefined) tmpMat.copy(worldMatrix(e, time.alpha))
-            else {
-              writeTransform(e, tmpObj, time.alpha)
-              tmpMat.compose(tmpObj.position, tmpObj.quaternion, tmpObj.scale)
-            }
-            rec.mesh.setMatrixAt(rec.count, tmpMat)
-            const c = e.get(InstanceColor)
-            if (c || rec.colored) {
-              tmpColor.setRGB(c?.r ?? 1, c?.g ?? 1, c?.b ?? 1)
-              rec.mesh.setColorAt(rec.count, tmpColor)
-              rec.colored = true
-            }
-            rec.count++
-          }
+    // InstanceSync: writes Instanced entities' interpolated transforms into their shared InstancedMesh.
+    const instances = (alpha: number) => {
+      const ents = world.query(Instanced, Transform)
+      for (const r of instMeshes.values()) r.count = 0
+      if (ents.length > 0) {
+        const keys = getStore(world, Instanced) as string[]
+        counts.clear()
+        for (let i = 0; i < ents.length; i++) {
+          const k = keys[(ents[i]! as number) & ENTITY_ID_MASK]!
+          counts.set(k, (counts.get(k) ?? 0) + 1)
         }
-        for (const r of instMeshes.values()) {
-          r.mesh.count = r.count
-          r.mesh.instanceMatrix.needsUpdate = true
-          if (r.mesh.instanceColor) r.mesh.instanceColor.needsUpdate = true
+        for (const [k, n] of counts) instMesh(k, n)
+        for (let i = 0; i < ents.length; i++) {
+          const e = ents[i]!
+          const rec = instMeshes.get(keys[(e as number) & ENTITY_ID_MASK]!)!
+          if (e.targetFor(ChildOf) !== undefined) tmpMat.copy(worldMatrix(e, alpha))
+          else {
+            writeTransform(e, tmpObj, alpha)
+            tmpMat.compose(tmpObj.position, tmpObj.quaternion, tmpObj.scale)
+          }
+          rec.mesh.setMatrixAt(rec.count, tmpMat)
+          const c = e.get(InstanceColor)
+          if (c || rec.colored) {
+            tmpColor.setRGB(c?.r ?? 1, c?.g ?? 1, c?.b ?? 1)
+            rec.mesh.setColorAt(rec.count, tmpColor)
+            rec.colored = true
+          }
+          rec.count++
         }
-      },
-      { name: 'InstanceSync', reads: [Transform, Instanced, InstanceColor], unchecked: true },
-    )
+      }
+      for (const r of instMeshes.values()) {
+        r.mesh.count = r.count
+        r.mesh.instanceMatrix.needsUpdate = true
+        if (r.mesh.instanceColor) r.mesh.instanceColor.needsUpdate = true
+      }
+    }
 
-    /** Draws the scene. */
-    const Draw = system(
-      ({ res }) => {
-        const r = res.get(Renderer)
-        if (!r.renderer) return
-        r.renderer.render(res.get(Scene), res.get(Camera))
-      },
-      { name: 'Draw' },
-    )
+    app.insert(RenderWork, { sync, instances })
     app.add(Render, RenderSync, InstanceSync.after(RenderSync), Draw.after(RenderSync, InstanceSync))
-    // Other plugins order their Render work against these (e.g. the camera rig runs between them).
-    app.ext.renderSystems = { RenderSync, Draw }
 
     app.hooks.start.push(async (canvas) => {
       if (!canvas || typeof window === 'undefined') return

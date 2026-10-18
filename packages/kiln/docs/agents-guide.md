@@ -14,6 +14,7 @@ kiln replay recordings/x.json        # replay a play session the user recorded (
 kiln run --steps 600 --snapshot Transform,Health --resources Score   # JSON world after N steps
 kiln check               # determinism lint (Math.random, Date.now, performance.now)
 kiln shot --steps 120 out.png        # one rendered frame from headless Chromium, when you need eyes
+kiln shot --setup shots/boss.ts --input '[{"frame":1,"hold":"right","frames":30}]' boss.png   # past the title screen
 kiln docs                # regenerate this file
 kiln add <plugin>        # vendor a community plugin into src/plugins/ (kiln add --list)
 ```
@@ -144,12 +145,17 @@ Events live for two runs of the phase that emitted them. Startup runs before the
 - 2D mode keeps the same traits; `z` is draw order and only Z rotation is used.
 - Renderer: `WebGPURenderer` (WebGL2 fallback), Three.js pinned to 0.186.1. Write custom materials
   with TSL (see the cheat sheet below); don't use `ShaderMaterial`/GLSL.
+- Render-phase work that needs interpolated positions (a custom camera, posing rigs) goes between
+  the render plugin's systems: `app.add(Render, Present.after(RenderSync).before(Draw))`. `RenderSync`,
+  `InstanceSync` and `Draw` are exported from `kiln`.
+- The `kiln()` Vite plugin dedupes `three` and `koota`, so a game and a linked kiln share one copy
+  (two copies of three break WebGPU lights: "Light node not found"). Keep `kiln()` in vite.config.ts.
 
 ## Input
 
 `res.get(Input)`: `axis` (`x` right−left, `y` up−down, length ≤ 1), `down('jump')`,
 `pressed('jump')` (exactly once per press, also in Fixed), `released(a)`, `value(a)`, `pointer`
-(`x, y, ndcX, ndcY, dx, dy, wheel, down`). Actions: `left right up down jump fire alt interact sprint
+(`x, y, ndcX, ndcY, dx, dy, wheel, down, locked`). Actions: `left right up down jump fire alt interact sprint
 pause`, mapped to keys, mouse and gamepad by the `ActionMap` resource. Scripted input for tests:
 
 Shortcuts take effect on the next step: `app.input.press(a)`, `.release(a)`, `.tap(a)`,
@@ -162,8 +168,14 @@ app.input.script([
   { frame: 40, press: 'fire' }, { frame: 50, release: 'fire' },
   { frame: 60, axis: { x: 0, y: 1 } },       // null hands the axis back
   { frame: 70, key: 'KeyE' },                // raw key through the action map
+  { frame: 80, pointer: { dx: 12, dy: -3, locked: true } },  // mouse look under pointer lock
 ])
 ```
+
+Mouse look: set `res.mut(Input).pointerLock = true` (e.g. while playing) and Kiln takes pointer lock
+on the canvas (right away after a click, else on the next click into it) and releases it when set
+back to false. `pointer.locked` says whether the lock is held (Escape drops it); while locked,
+`pointer.dx/dy` carry the raw mouse movement. Both are recorded, so mouse-look sessions replay.
 
 ## Assets
 
@@ -382,7 +394,7 @@ app yourself (dispose it after).
 In dev, every browser session records from boot. **F8** saves it to `recordings/<name>.json` in the
 game folder (a crash saves `recordings/crash-....json` on its own; `__kiln_save_recording(name)` does
 it from the console or Playwright). A recording holds the seed and loop config, every frame's delta,
-what the game saw from input (action values, stick axis, pointer), DOM HUD clicks, the frame each
+what the game saw from input (action values, stick axis, pointer and pointer lock), DOM HUD clicks, the frame each
 asset load finished on, the stored saves the session started with, and a state hash every 60 frames.
 When a user says "I recorded it", replay it before reading code:
 
@@ -418,6 +430,9 @@ guaranteed (see design decisions), and `Math.sin`/`cos`/`pow` can differ in the 
 Chrome's V8 and Bun's JavaScriptCore, so long physics-heavy replays can drift. Read frames before
 `divergedAt` as exact and frames after it as approximate. Plugins with outside input of their own use
 `noteChannel(app, kind, data)` / `replayChannel(app, kind, apply)` and `recordStartState(...)`.
+
+To see a frame of the session: `kiln shot --recording recordings/x.json --until 300 bug.png` replays
+it in headless Chromium and renders that frame.
 
 ## A complete feature
 
