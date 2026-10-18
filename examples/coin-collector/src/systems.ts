@@ -1,5 +1,5 @@
-import { Camera, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform } from 'kiln'
-import { Bob, CoinCollected, Hud, IsCoin, IsPlayer, Level, Score, Spin, Velocity, WaveCleared } from './data.ts'
+import { Camera, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform, Ui } from 'kiln'
+import { Bob, CoinCollected, IsCoin, IsPlayer, Level, Score, Spin, Velocity, WaveCleared } from './data.ts'
 import { Ground, Player, spawnCoins } from './prefabs.ts'
 
 /** Player speed in units per second. */
@@ -100,10 +100,7 @@ export const CameraFollow = system({ player: [Transform, IsPlayer] }, ({ player 
   cam.lookAt(cam.position.x - o.x, cam.position.y - o.y, cam.position.z - o.z)
 })
 
-/** Writes score and wave into the HUD overlay. Does nothing headless. */
+/** Writes score and wave into the HUD (top left). */
 export const UpdateHud = system(({ res }) => {
-  const { el } = res.get(Hud)
-  if (!el) return
-  const text = `Coins ${res.get(Score).value} · Wave ${res.get(Level).wave}`
-  if (el.textContent !== text) el.textContent = text
+  res.mut(Ui).text('score', `Coins ${res.get(Score).value} · Wave ${res.get(Level).wave}`)
 })

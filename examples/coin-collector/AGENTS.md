@@ -288,7 +288,7 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 ## This game
 
 Config: `mode: '3d'`, `fixedHz: 60`, `seed: 42`, `hotReload: "keep"`.
-Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, TimerPlugin, TweenPlugin, DebugPlugin.
+Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, TimerPlugin, TweenPlugin, UiPlugin, DebugPlugin.
 
 ### Schedule
 
@@ -305,6 +305,7 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 | # | System | Writes | Reads | Resources | After | File |
 |---|---|---|---|---|---|---|
 | 1 | PollInput | – | – | Input (w), ActionMap | – | (kiln) |
+| 2 | UiEvents | – | – | Input, Ui | – | (kiln) |
 
 **Fixed**
 
@@ -326,7 +327,7 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 |---|---|---|---|---|---|---|
 | 1 | SpawnModels | – | MeshRef, Model | – | – | (kiln) |
 | 2 | CameraFollow | – | IsPlayer, Transform | Camera (w) | – | src/systems.ts |
-| 3 | UpdateHud | – | – | Hud | – | src/systems.ts |
+| 3 | UpdateHud | – | – | Ui (w), Level, Score | – | src/systems.ts |
 
 **Render**
 
@@ -335,6 +336,7 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 | 1 | RenderSync | – | MeshRef, Transform | – | – | (kiln) |
 | 2 | InstanceSync | – | InstanceColor, Instanced, Transform | – | RenderSync | (kiln) |
 | 3 | Draw | – | – | – | RenderSync, InstanceSync | (kiln) |
+| 4 | RenderUi | – | – | – | – | (kiln) |
 
 ### Traits
 
@@ -352,7 +354,6 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 
 ### Resources
 
-- **Hud** (`src/data.ts`): The score overlay element, or null when headless.
 - **Level** (`src/data.ts`): Level layout: arena half-size, coin count per wave, and the current wave number.
 - **Score** (`src/data.ts`): Coins collected so far.
 
@@ -372,7 +373,7 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 - **PlayerMove** (`src/systems.ts`): Turns the input axis into player velocity on the ground plane (up = -z, away from the camera).
 - **SpawnLevel** (`src/systems.ts`): Startup: the floor, the player at the origin, and the first wave of coins.
 - **Spinner** (`src/systems.ts`): Advances Spin and writes it as yaw.
-- **UpdateHud** (`src/systems.ts`): Writes score and wave into the HUD overlay. Does nothing headless.
+- **UpdateHud** (`src/systems.ts`): Writes score and wave into the HUD (top left).
 
 ### Other exports
 

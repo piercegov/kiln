@@ -82,7 +82,9 @@ export default async function shot(args: Args, root: string): Promise<number> {
     await page.goto(`http://127.0.0.1:${port}/__kiln/shot?${q}`)
     await page.waitForFunction(() => (window as any).__kilnShot, null, { timeout: num(args.timeout, 60000) })
     const result = (await page.evaluate(() => (window as any).__kilnShot)) as { ok: boolean; tick?: number; backend?: string; error?: string; code?: string }
-    if (result.ok) await page.locator('canvas').first().screenshot({ path: out })
+    // A page clip over the canvas, so HUD elements drawn over it are in the shot too.
+    const box = result.ok ? await page.locator('canvas').first().boundingBox() : null
+    if (box) await page.screenshot({ path: out, clip: box })
     else await page.screenshot({ path: out })
     const report = { ...result, out, steps, errors, warnings }
     if (args.json) console.log(JSON.stringify(report))
