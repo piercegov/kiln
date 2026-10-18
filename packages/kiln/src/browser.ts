@@ -138,11 +138,15 @@ export async function shot(main: MainFn, canvas: HTMLCanvasElement): Promise<voi
     const app = await main()
     g.__kiln_app = app
     await app.start(canvas, { loop: false })
+    // Assets requested in Startup load before the steps, as in scenarios, so the frame is deterministic.
+    await app.idle()
     // Simulate without drawing, then draw once: the renderer uploads some per-frame data (instance
     // colours) only once per browser frame, so many renders in one frame would lose updates.
     app.headless = true
     app.step(steps)
     app.headless = false
+    // Assets requested during the steps (sprite sheets, models) land before the one draw.
+    await app.idle()
     app.render()
     // Wait for the GPU to finish the frame before the screenshot.
     await new Promise((r) => requestAnimationFrame(() => r(null)))
