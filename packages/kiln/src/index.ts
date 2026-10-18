@@ -56,3 +56,5 @@ export { savePlugin, Saves, SaveSlots, Saved, Loaded, memoryStorage, localStorag
 export type { SaveOptions, SaveStorage } from './plugins/save/index.ts'
 export { animationGraph, AnimationController, AnimationEvent, AnimationStateChanged, AnimationFinished } from './plugins/animation/index.ts'
 export type { AnimationGraph, AnimationGraphSpec, AnimationStateSpec, AnimationEventSpec, TransitionSpec, ParamTest, LoopMode } from './plugins/animation/index.ts'
+export { SpriteAnimationPlugin, SpriteAnimator, SpriteAnimation, spriteAnimator, spriteSheet, SpriteSheets, AnimateSprites } from './plugins/animation/index.ts'
+export type { SpriteSheet, SpriteSheetSpec, SpriteClipSpec, SpriteAnimatorOptions } from './plugins/animation/index.ts'

@@ -13,3 +13,5 @@ export {
   cycleOf,
 } from './graph.ts'
 export type { AnimationGraph, AnimationGraphSpec, AnimationStateSpec, AnimationEventSpec, TransitionSpec, ParamTest, LoopMode, ClipInfo, Fade, AnimationSink } from './graph.ts'
+export { SpriteAnimationPlugin, SpriteAnimator, SpriteAnimation, spriteAnimator, spriteSheet, SpriteSheets, SpriteSheetStore, AnimateSprites } from './sprite.ts'
+export type { SpriteSheet, SpriteSheetSpec, SpriteClipSpec, SpriteAnimatorOptions, AtlasRect } from './sprite.ts'
