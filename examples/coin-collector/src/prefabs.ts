@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { MeshRef, prefab, SharedMesh, Transform, type Commands, type RngState, type Vec3 } from 'kiln'
+import { CameraTarget, MeshRef, prefab, SharedMesh, Transform, type Commands, type RngState, type TweenManager, type Vec3 } from 'kiln'
 import { Bob, IsCoin, IsPlayer, Spin, Velocity } from './data.ts'
 
 /** The arena floor, `size` units across, with a grid on top. */
@@ -13,11 +13,12 @@ export const Ground = prefab((p: { size: number }) => {
 
 const playerGeometry = new THREE.CapsuleGeometry(0.4, 0.6, 4, 12)
 
-/** The player: a capsule standing on the ground at `at`. */
+/** The player: a capsule standing on the ground at `at`. The camera follows it. */
 export const Player = prefab((p: { at: Vec3 }) => [
   Transform({ x: p.at.x, y: 0.7, z: p.at.z }),
   Velocity,
   IsPlayer,
+  CameraTarget,
   MeshRef(new THREE.Mesh(playerGeometry, new THREE.MeshStandardMaterial({ color: 0x4d96ff, roughness: 0.4 }))),
 ])
 
@@ -35,10 +36,10 @@ export const Coin = prefab((p: { at: Vec3; phase: number }) => [
 ])
 
 /**
- * Queues `count` coins on whole-unit grid points inside the arena, never on the centre tile.
- * Shared by SpawnLevel and NextWave; randomness comes from the seeded Rng.
+ * Queues `count` coins on whole-unit grid points inside the arena, never on the centre tile, each
+ * popping in with a scale tween. Shared by SpawnLevel and NextWave; randomness comes from the seeded Rng.
  */
-export function spawnCoins(commands: Commands, rng: RngState, halfSize: number, count: number): void {
+export function spawnCoins(commands: Commands, tweens: TweenManager, rng: RngState, halfSize: number, count: number): void {
   const taken = new Set<string>(['0,0'])
   const n = Math.floor(halfSize) - 1
   while (taken.size - 1 < count) {
@@ -47,6 +48,8 @@ export function spawnCoins(commands: Commands, rng: RngState, halfSize: number, 
     const key = `${x},${z}`
     if (taken.has(key)) continue
     taken.add(key)
-    commands.spawn(Coin, { at: { x, y: 0, z }, phase: rng.float(0, Math.PI * 2) })
+    const coin = commands.spawn(Coin, { at: { x, y: 0, z }, phase: rng.float(0, Math.PI * 2) })
+    const pop = { sx: 1, sy: 1, sz: 1 }
+    tweens.to(coin, Transform, pop, { from: { sx: 0, sy: 0, sz: 0 }, duration: 0.35, delay: (taken.size % 10) * 0.03, ease: 'outBack' })
   }
 }

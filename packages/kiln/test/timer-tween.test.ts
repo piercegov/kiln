@@ -131,7 +131,7 @@ describe('tweens', () => {
     const e = app.spawn(Transform({ y: 3 }))
     app.res(Tweens).to(e, Transform, { y: 1 }, { duration: 0.5, delay: 0.5, from: { y: 0 }, yoyo: true, repeat: 1, ease: 'linear' })
     app.step(30)
-    expect(app.get(e, Transform)!.y).toBe(3)
+    expect(app.get(e, Transform)!.y).toBe(0) // `from` shows during the delay
     app.step(30)
     expect(app.get(e, Transform)!.y).toBeCloseTo(1, 9)
     app.step(15)

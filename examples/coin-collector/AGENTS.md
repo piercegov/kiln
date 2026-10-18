@@ -288,7 +288,7 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 ## This game
 
 Config: `mode: '3d'`, `fixedHz: 60`, `seed: 42`, `hotReload: "keep"`.
-Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, TimerPlugin, TweenPlugin, UiPlugin, DebugPlugin.
+Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, TimerPlugin, TweenPlugin, UiPlugin, DebugPlugin, CameraPlugin, SavePlugin.
 
 ### Schedule
 
@@ -298,7 +298,7 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 
 | # | System | Writes | Reads | Resources | After | File |
 |---|---|---|---|---|---|---|
-| 1 | SpawnLevel | – | – | Rng (w), Level | – | src/systems.ts |
+| 1 | SpawnLevel | – | – | CameraRig (w), Rng (w), Tweens (w), Level | – | src/systems.ts |
 
 **Input**
 
@@ -312,22 +312,24 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 | # | System | Writes | Reads | Resources | After | File |
 |---|---|---|---|---|---|---|
 | 1 | TickTimers | Lifetime, Timer | – | Delayed | – | (kiln) |
-| 2 | TickTweens | – | – | Tweens | – | (kiln) |
-| 3 | PlayerMove | Velocity | IsPlayer | Input | – | src/systems.ts |
-| 4 | Movement | Transform | Velocity | – | PlayerMove | src/systems.ts |
-| 5 | ClampToArena | Transform | IsPlayer | Level | Movement | src/systems.ts |
-| 6 | Spinner | Spin, Transform | – | – | ClampToArena | src/systems.ts |
-| 7 | Bobber | Transform | Bob | – | Spinner | src/systems.ts |
-| 8 | CollectCoins | – | IsCoin, IsPlayer, Transform | – | Bobber | src/systems.ts |
-| 9 | NextWave | – | – | – | CollectCoins | src/systems.ts |
+| 2 | TickTweens | – | – | Tweens (w) | – | (kiln) |
+| 3 | PlayerMove | Velocity | IsPlayer | Input, Screen | – | src/systems.ts |
+| 4 | Movement | Transform | Velocity | Screen | PlayerMove | src/systems.ts |
+| 5 | ClampToArena | Transform | IsPlayer | Level, Screen | Movement | src/systems.ts |
+| 6 | Spinner | Spin, Transform | – | Screen | ClampToArena | src/systems.ts |
+| 7 | Bobber | Transform | Bob | Screen | Spinner | src/systems.ts |
+| 8 | CollectCoins | – | IsCoin, IsPlayer, Transform | Screen | Bobber | src/systems.ts |
+| 9 | NextWave | – | – | Screen | CollectCoins | src/systems.ts |
 
 **Update**
 
 | # | System | Writes | Reads | Resources | After | File |
 |---|---|---|---|---|---|---|
 | 1 | SpawnModels | – | MeshRef, Model | – | – | (kiln) |
-| 2 | CameraFollow | – | IsPlayer, Transform | Camera (w) | – | src/systems.ts |
-| 3 | UpdateHud | – | – | Ui (w), Level, Score | – | src/systems.ts |
+| 2 | CameraRigUpdate | – | CameraTarget, Transform | Camera (w), CameraRig (w) | – | (kiln) |
+| 3 | TogglePause | – | – | Input, Screen | – | src/systems.ts |
+| 4 | TrackBest | – | – | Best, Score | – | src/systems.ts |
+| 5 | UpdateHud | – | – | Ui (w), Best, Level, Score | – | src/systems.ts |
 
 **Render**
 
@@ -335,8 +337,9 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 |---|---|---|---|---|---|---|
 | 1 | RenderSync | – | MeshRef, Transform | – | – | (kiln) |
 | 2 | InstanceSync | – | InstanceColor, Instanced, Transform | – | RenderSync | (kiln) |
-| 3 | Draw | – | – | – | RenderSync, InstanceSync | (kiln) |
-| 4 | RenderUi | – | – | – | – | (kiln) |
+| 3 | RenderUi | – | – | – | – | (kiln) |
+| 4 | CameraRigInterpolate | – | – | – | RenderSync | (kiln) |
+| 5 | Draw | – | – | – | RenderSync, InstanceSync, CameraRigInterpolate | (kiln) |
 
 ### Traits
 
@@ -350,10 +353,11 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 
 - **Coin** (`src/prefabs.ts`): A spinning, bobbing coin at `at` (y is ignored). Geometry and material are shared.
 - **Ground** (`src/prefabs.ts`): The arena floor, `size` units across, with a grid on top.
-- **Player** (`src/prefabs.ts`): The player: a capsule standing on the ground at `at`.
+- **Player** (`src/prefabs.ts`): The player: a capsule standing on the ground at `at`. The camera follows it.
 
 ### Resources
 
+- **Best** (`src/data.ts`): The best score ever reached. Persisted across sessions by savePlugin in main.ts.
 - **Level** (`src/data.ts`): Level layout: arena half-size, coin count per wave, and the current wave number.
 - **Score** (`src/data.ts`): Coins collected so far.
 
@@ -365,27 +369,30 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 ### Systems
 
 - **Bobber** (`src/systems.ts`): Moves Bob entities up and down on a sine of simulated time.
-- **CameraFollow** (`src/systems.ts`): Eases the camera toward a point above and behind the player.
 - **ClampToArena** (`src/systems.ts`): Keeps the player inside the arena walls.
 - **CollectCoins** (`src/systems.ts`): Despawns coins within reach of the player, adds score, and reports a cleared wave.
 - **Movement** (`src/systems.ts`): Integrates Velocity into Transform.
 - **NextWave** (`src/systems.ts`): When a wave is cleared, spawns the next one with two more coins.
 - **PlayerMove** (`src/systems.ts`): Turns the input axis into player velocity on the ground plane (up = -z, away from the camera).
-- **SpawnLevel** (`src/systems.ts`): Startup: the floor, the player at the origin, and the first wave of coins.
+- **SpawnLevel** (`src/systems.ts`): Startup: the floor, the player at the origin, the first wave of coins, and the camera offset.
 - **Spinner** (`src/systems.ts`): Advances Spin and writes it as yaw.
-- **UpdateHud** (`src/systems.ts`): Writes score and wave into the HUD (top left).
+- **TogglePause** (`src/systems.ts`): Pauses on the `pause` action and shows a pause menu; the action or the Resume button resumes.
+- **TrackBest** (`src/systems.ts`): Keeps the best score up to date (it is persisted by savePlugin).
+- **UpdateHud** (`src/systems.ts`): Writes score, wave and best into the HUD (top left).
 
 ### Other exports
 
 - **PICKUP_RADIUS** (`src/systems.ts`): Pickup radius between the player's and a coin's centres.
 - **PLAYER_SPEED** (`src/systems.ts`): Player speed in units per second.
-- **spawnCoins** (`src/prefabs.ts`): Queues `count` coins on whole-unit grid points inside the arena, never on the centre tile. Shared by SpawnLevel and NextWave; randomness comes from the seeded Rng.
+- **Screen** (`src/data.ts`): Whether gameplay runs. The `pause` action (Escape, Start) toggles it.
+- **spawnCoins** (`src/prefabs.ts`): Queues `count` coins on whole-unit grid points inside the arena, never on the centre tile, each popping in with a scale tween. Shared by SpawnLevel and NextWave; randomness comes from the seeded Rng.
 
 ### Scenarios
 
 - `scenarios/collect.test.ts`: “walking onto a coin collects it”, “standing still collects nothing”
 - `scenarios/determinism.test.ts`: “same seed and input script, same world”, “the seed changes the coin layout”
 - `scenarios/movement.test.ts`: “up moves away from the camera (-z) at PLAYER_SPEED”, “the arena walls hold”
+- `scenarios/pause.test.ts`: “pause freezes gameplay and shows a menu; Resume continues”, “coins pop in with a scale tween”, “the HUD shows score and best”
 - `scenarios/waves.test.ts`: “clearing a wave spawns the next one with two more coins”
 
 <!-- kiln:generated:end -->

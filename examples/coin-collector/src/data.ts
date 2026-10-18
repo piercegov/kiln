@@ -1,4 +1,4 @@
-import { event, resource, trait, type Entity } from 'kiln'
+import { event, resource, state, trait, type Entity } from 'kiln'
 
 // Traits
 
@@ -24,6 +24,14 @@ export const Score = resource({ value: 0 })
 
 /** Level layout: arena half-size, coin count per wave, and the current wave number. */
 export const Level = resource({ halfSize: 9, coins: 20, wave: 1 })
+
+/** The best score ever reached. Persisted across sessions by savePlugin in main.ts. */
+export const Best = resource({ score: 0 })
+
+// States
+
+/** Whether gameplay runs. The `pause` action (Escape, Start) toggles it. */
+export const Screen = state(['playing', 'paused'], 'playing')
 
 // Events
 

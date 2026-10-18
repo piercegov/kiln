@@ -1,5 +1,5 @@
-import { Camera, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform, Ui } from 'kiln'
-import { Bob, CoinCollected, IsCoin, IsPlayer, Level, Score, Spin, Velocity, WaveCleared } from './data.ts'
+import { CameraRig, CameraShake, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform, Tweens, Ui, UiClick } from 'kiln'
+import { Best, Bob, CoinCollected, IsCoin, IsPlayer, Level, Score, Screen, Spin, Velocity, WaveCleared } from './data.ts'
 import { Ground, Player, spawnCoins } from './prefabs.ts'
 
 /** Player speed in units per second. */
@@ -8,17 +8,15 @@ export const PLAYER_SPEED = 6
 /** Pickup radius between the player's and a coin's centres. */
 export const PICKUP_RADIUS = 0.8
 
-/** Camera offset from the player. */
-const CAMERA_OFFSET = { x: 0, y: 11, z: 9 }
-
 // Startup
 
-/** Startup: the floor, the player at the origin, and the first wave of coins. */
+/** Startup: the floor, the player at the origin, the first wave of coins, and the camera offset. */
 export const SpawnLevel = system(({ commands, res }) => {
   const level = res.get(Level)
   commands.spawn(Ground, { size: level.halfSize * 2 + 2 })
   commands.spawn(Player, { at: origin })
-  spawnCoins(commands, res.mut(Rng), level.halfSize, level.coins)
+  spawnCoins(commands, res.mut(Tweens), res.mut(Rng), level.halfSize, level.coins)
+  res.mut(CameraRig).offset = { x: 0, y: 11, z: 9 }
 })
 
 // Fixed
@@ -68,6 +66,7 @@ export const CollectCoins = system(
         commands.despawn(coin)
         res.mut(Score).value += 1
         events.emit(CoinCollected, { coin, by: p })
+        events.emit(CameraShake, { amount: 0.25 })
         collected++
       }
     })
@@ -81,26 +80,37 @@ export const NextWave = system(({ events, res, commands }) => {
     const level = res.mut(Level)
     level.wave += 1
     level.coins += 2
-    spawnCoins(commands, res.mut(Rng), level.halfSize, level.coins)
+    spawnCoins(commands, res.mut(Tweens), res.mut(Rng), level.halfSize, level.coins)
   }
 })
 
 // Update
 
-/** Eases the camera toward a point above and behind the player. */
-export const CameraFollow = system({ player: [Transform, IsPlayer] }, ({ player }, { res, time }) => {
-  const p = player.first()?.get(Transform)
-  if (!p) return
-  const cam = res.mut(Camera)
-  const o = CAMERA_OFFSET
-  const k = 1 - Math.exp(-6 * time.dt)
-  cam.position.x += (p.x + o.x - cam.position.x) * k
-  cam.position.y += (p.y + o.y - cam.position.y) * k
-  cam.position.z += (p.z + o.z - cam.position.z) * k
-  cam.lookAt(cam.position.x - o.x, cam.position.y - o.y, cam.position.z - o.z)
+/** Pauses on the `pause` action and shows a pause menu; the action or the Resume button resumes. */
+export const TogglePause = system(({ res, events }) => {
+  const screen = res.get(Screen)
+  const resume = events.read(UiClick).some((c) => c.id === 'pause.resume')
+  if (!resume && !res.get(Input).pressed('pause')) return
+  const ui = res.mut(Ui)
+  if (screen.is('playing') && !resume) {
+    res.mut(Screen).set('paused')
+    ui.text('pause.title', 'Paused', { anchor: 'center', size: 48 })
+    ui.button('pause.resume', 'Resume', { anchor: 'center' })
+  } else if (screen.is('paused')) {
+    res.mut(Screen).set('playing')
+    ui.clear('pause.')
+  }
 })
 
-/** Writes score and wave into the HUD (top left). */
+/** Keeps the best score up to date (it is persisted by savePlugin). */
+export const TrackBest = system(({ res }) => {
+  const score = res.get(Score).value
+  if (score > res.get(Best).score) res.mut(Best).score = score
+})
+
+/** Writes score, wave and best into the HUD (top left). */
 export const UpdateHud = system(({ res }) => {
-  res.mut(Ui).text('score', `Coins ${res.get(Score).value} · Wave ${res.get(Level).wave}`)
+  const ui = res.mut(Ui)
+  ui.text('score', `Coins ${res.get(Score).value} · Wave ${res.get(Level).wave}`)
+  ui.text('best', `Best ${res.get(Best).score}`, { size: 14, color: '#c8d0dc' })
 })

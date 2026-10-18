@@ -100,6 +100,8 @@ interface Active extends Spec {
   next: Spec[]
   /** Removed without TweenDone: its entity went away or a newer tween took all its fields. */
   dropped: boolean
+  /** `from` values have been written. */
+  primed: boolean
 }
 
 /** A started tween; `.then(...)` queues another to start when this one finishes. */
@@ -171,6 +173,7 @@ export class TweenManager {
       easeFn: easing(spec.opts.ease),
       next: [],
       dropped: false,
+      primed: false,
     }
     this.active.push(a)
     return this.handle(a)
@@ -238,6 +241,11 @@ export class TweenManager {
           continue
         }
       }
+      if (!a.primed) {
+        a.primed = true
+        // `from` values show at once, during any delay, so nothing flashes at its end value first.
+        if (a.opts.from) this.writeValues(a, entity, a.opts.from)
+      }
       if (a.delay > 0) {
         a.delay--
         continue
@@ -295,6 +303,13 @@ export class TweenManager {
       }
       if (Object.keys(other.values).length === 0) other.dropped = true
     }
+  }
+
+  private writeValues(a: Active, entity: Entity | undefined, values: Record<string, number>): void {
+    const patch: Record<string, number> = {}
+    for (const f in values) if (f in a.values) patch[f] = values[f]!
+    if (a.trait) entity!.set(a.trait, patch as never)
+    else Object.assign(a.target, patch)
   }
 
   private write(a: Active, entity: Entity | undefined, k: number): void {

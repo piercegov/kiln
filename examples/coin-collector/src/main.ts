@@ -1,13 +1,13 @@
-import { chain, createApp, CorePlugins, Fixed, Startup, Update } from 'kiln'
+import { CameraPlugin, chain, createApp, CorePlugins, Fixed, inState, runIf, savePlugin, Startup, Update } from 'kiln'
 import config from '../kiln.config.ts'
-import { CoinCollected, Level, Score, WaveCleared } from './data.ts'
-import { Bobber, CameraFollow, ClampToArena, CollectCoins, Movement, NextWave, PlayerMove, SpawnLevel, Spinner, UpdateHud } from './systems.ts'
+import { Best, CoinCollected, Level, Score, Screen, WaveCleared } from './data.ts'
+import { ClampToArena, CollectCoins, Movement, NextWave, PlayerMove, SpawnLevel, Spinner, Bobber, TogglePause, TrackBest, UpdateHud } from './systems.ts'
 
-/** Coin Collector: move with WASD / arrows / left stick, collect every coin to start the next wave. */
+/** Coin Collector: move with WASD / arrows / left stick, collect every coin to start the next wave. Escape pauses. */
 export default () =>
   createApp(config)
-    .use(CorePlugins)
-    .init(Score, Level, CoinCollected, WaveCleared)
+    .use(CorePlugins, CameraPlugin, savePlugin({ key: 'coin-collector', persist: [Best] }))
+    .init(Score, Level, Screen, CoinCollected, WaveCleared)
     .add(Startup, SpawnLevel)
-    .add(Fixed, chain(PlayerMove, Movement, ClampToArena, Spinner, Bobber, CollectCoins, NextWave))
-    .add(Update, CameraFollow, UpdateHud)
+    .add(Fixed, runIf(inState(Screen, 'playing'), chain(PlayerMove, Movement, ClampToArena, Spinner, Bobber, CollectCoins, NextWave)))
+    .add(Update, TogglePause, TrackBest, UpdateHud)
