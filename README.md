@@ -4,7 +4,7 @@ An agent-first game framework on Three.js: a fixed-step loop, a [Koota](https://
 ECS, and a render bridge, designed so a coding agent can add a feature with a few exports and one
 scheduling line, and verify it headlessly.
 
-**Docs:** https://kiln-docs-8zp.pages.dev
+[![Docs](https://img.shields.io/badge/docs-read%20online-orange?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kiln-docs-8zp.pages.dev)
 
 ```ts
 // src/systems.ts
