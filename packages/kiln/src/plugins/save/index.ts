@@ -1,4 +1,4 @@
-import { $internal, $relation, type ConfigurableTrait, type Entity, type Trait } from 'koota'
+import { $internal, $relation, type ConfigurableTrait, type Entity, type Relation, type Trait } from 'koota'
 import type { App } from '../../core/app.ts'
 import { KilnError } from '../../core/errors.ts'
 import { event } from '../../core/event.ts'
@@ -52,9 +52,10 @@ export interface SaveOptions {
   /**
    * Entities to save: every entity with at least one of these traits, with these traits' values.
    * Loading replaces those entities. Non-JSON traits (MeshRef) can't be saved: rebuild visuals on
-   * `Loaded`, or with a system over `[IsCoin, Not(MeshRef)]`.
+   * `Loaded`, or with a system over `[IsCoin, Not(MeshRef)]`. Relations listed here are relinked
+   * between saved entities.
    */
-  traits?: Trait[]
+  traits?: (Trait | Relation<any>)[]
   /** Resources kept across sessions automatically (settings, high scores): loaded at startup, saved when they change. */
   persist?: Resource<any>[]
   /** Storage key prefix, so games on one origin don't collide. Default 'kiln'. */
@@ -86,7 +87,7 @@ export class SaveSlots {
 
   constructor(
     private readonly app: App,
-    private readonly opts: Required<Pick<SaveOptions, 'resources' | 'traits' | 'key'>> & { storage: SaveStorage },
+    private readonly opts: { resources: Resource<any>[]; traits: Trait[]; key: string; storage: SaveStorage },
   ) {}
 
   private slotKey(slot: string): string {
@@ -202,7 +203,7 @@ export function savePlugin(options: SaveOptions = {}): Plugin {
   return plugin((app) => {
     const storage = options.storage ?? localStorageStorage() ?? memoryStorage()
     const key = options.key ?? 'kiln'
-    const slots = new SaveSlots(app, { resources: options.resources ?? [], traits: options.traits ?? [], key, storage })
+    const slots = new SaveSlots(app, { resources: options.resources ?? [], traits: (options.traits ?? []) as Trait[], key, storage })
     app.insert(Saves, slots)
     app.init(Saved, Loaded)
     for (const r of options.resources ?? []) app.init(r)
