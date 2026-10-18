@@ -21,6 +21,7 @@ import {
   system,
   Transform,
 } from '../src/index.ts'
+import { frameUvs } from '../src/plugins/animation/index.ts'
 
 const apps: App[] = []
 afterEach(() => {
@@ -187,5 +188,35 @@ describe('sprite animation', () => {
     const app = mk2d()
     app.spawn(Transform, SpriteAnimator)
     expect(() => app.step(1)).toThrow('Spawn it with spriteAnimator(MySheet')
+  })
+})
+
+describe('sprite texel bleeding', () => {
+  const round = (xs: number[]) => xs.map((v) => Math.round(v * 1e6) / 1e6)
+
+  test('frame UVs are inset by half a texel so edges never sample the neighbouring frame', () => {
+    // 4x2 grid on a 64x32 image: 16x16 frames; half a texel is 0.5/64 across and 0.5/32 down.
+    expect(round(frameUvs(Sheet, 0, 64, 32))).toEqual(round([0.5 / 64, 0.5 + 0.5 / 32, 0.25 - 0.5 / 64, 1 - 0.5 / 32]))
+    expect(round(frameUvs(Sheet, 5, 64, 32))).toEqual(round([0.25 + 0.5 / 64, 0.5 / 32, 0.5 - 0.5 / 64, 0.5 - 0.5 / 32]))
+    // Unknown size (texture still loading): the exact cell.
+    expect(frameUvs(Sheet, 0)).toEqual([0, 0.5, 0.25, 1])
+    // Atlas sheets know their size up front.
+    const atlas = spriteSheet({ texture: null, atlas: { width: 100, height: 50, frames: [{ x: 10, y: 0, w: 20, h: 10 }] }, clips: { a: { frames: [0] } } })
+    expect(round(frameUvs(atlas, 0))).toEqual(round([0.105, 0.81, 0.295, 0.99]))
+    // A one-texel frame collapses to its centre instead of inverting.
+    const tiny = spriteSheet({ texture: null, columns: 64, clips: { a: { frames: [0] } } })
+    expect(round(frameUvs(tiny, 0, 64, 1))).toEqual(round([0.5 / 64, 0.5, 0.5 / 64, 0.5]))
+  })
+
+  test('quads use the inset UVs once the texture size is known, and pixel art has no mipmaps', () => {
+    const tex = new THREE.Texture({ width: 64, height: 32 } as never)
+    const sheet = spriteSheet({ texture: tex, columns: 4, rows: 2, clips: { idle: { range: [0, 3] } } })
+    const app = mk2d()
+    const e = app.spawn(Transform, spriteAnimator(sheet, { flipX: true }))
+    app.step(1)
+    const [u0, v0, u1, v1] = frameUvs(sheet, 0, 64, 32)
+    expect(uvs(app, e)).toEqual(round([u1, v1, u0, v1, u1, v0, u0, v0]).map((v) => Math.round(v * 1000) / 1000))
+    expect(tex.generateMipmaps).toBe(false)
+    expect(tex.minFilter).toBe(THREE.NearestFilter)
   })
 })

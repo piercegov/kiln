@@ -139,7 +139,7 @@ export class SpriteAnimation extends AnimationController {
   /** The quad the plugin made (its MeshRef). */
   mesh: THREE.Mesh | null = null
   /** What the UVs were last written for. */
-  shown = { frame: -1, flipX: false }
+  shown = { frame: -1, flipX: false, texW: 0, texH: 0 }
 
   constructor(sheet: SpriteSheet | null = null, options: SpriteAnimatorOptions = {}) {
     super(options.graph ?? null, options.play)
@@ -196,6 +196,8 @@ export class SpriteSheetStore {
     const nearest = (s.filter ?? 'nearest') === 'nearest'
     tex.magFilter = nearest ? THREE.NearestFilter : THREE.LinearFilter
     tex.minFilter = nearest ? THREE.NearestFilter : THREE.LinearMipmapLinearFilter
+    // Mip levels average neighbouring frames together; pixel art never needs them.
+    tex.generateMipmaps = !nearest
     tex.colorSpace = THREE.SRGBColorSpace
     tex.needsUpdate = true
     material.map = tex
@@ -237,6 +239,26 @@ export const SpriteSheets = resource((app): SpriteSheetStore => {
   return store
 }, { readonlyProxy: false }).named('SpriteSheets')
 
+/**
+ * A frame's UV rectangle [u0, v0, u1, v1], pulled in by half a texel on each side when the image
+ * size is known. Edges exactly on the frame boundary sample the neighbouring frame at sub-pixel
+ * positions (and under linear filtering), which shows as a border of the next frame.
+ */
+export function frameUvs(sheet: SpriteSheet, frame: number, texW = 0, texH = 0): [number, number, number, number] {
+  const [u0, v0, u1, v1] = sheet.uvs[frame]!
+  const w = texW || sheet.spec.atlas?.width || 0
+  const h = texH || sheet.spec.atlas?.height || 0
+  const du = w > 0 ? Math.min(0.5 / w, (u1 - u0) / 2) : 0
+  const dv = h > 0 ? Math.min(0.5 / h, (v1 - v0) / 2) : 0
+  return [u0 + du, v0 + dv, u1 - du, v1 - dv]
+}
+
+/** The pixel size of a material's map, or 0 while it is loading (headless placeholders have none). */
+function mapSize(mesh: THREE.Mesh): [number, number] {
+  const img = (mesh.material as THREE.MeshBasicMaterial).map?.image as { width?: number; height?: number } | undefined
+  return [img?.width ?? 0, img?.height ?? 0]
+}
+
 /** Writes a frame's UVs into a quad (flipped for flipX). */
 function writeUvs(mesh: THREE.Mesh, uv: readonly [number, number, number, number], flipX: boolean): void {
   const attr = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute
@@ -273,10 +295,15 @@ export const AnimateSprites = system(
     const info = anim.clipInfo(anim.clip) as ResolvedClip
     anim.clipFrame = frameIndex(info, anim.loop, anim.time)
     anim.frame = info.sheetFrames[anim.clipFrame]!
-    if (anim.frame !== anim.shown.frame || anim.flipX !== anim.shown.flipX) {
-      writeUvs(anim.mesh, sheet.uvs[anim.frame]!, anim.flipX)
-      anim.shown.frame = anim.frame
-      anim.shown.flipX = anim.flipX
+    const [texW, texH] = mapSize(anim.mesh)
+    const shown = anim.shown
+    // The texture's size arriving also rewrites, so the half-texel inset applies once it is known.
+    if (anim.frame !== shown.frame || anim.flipX !== shown.flipX || texW !== shown.texW || texH !== shown.texH) {
+      writeUvs(anim.mesh, frameUvs(sheet, anim.frame, texW, texH), anim.flipX)
+      shown.frame = anim.frame
+      shown.flipX = anim.flipX
+      shown.texW = texW
+      shown.texH = texH
     }
   },
 )

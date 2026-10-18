@@ -13,7 +13,7 @@ export {
   cycleOf,
 } from './graph.ts'
 export type { AnimationGraph, AnimationGraphSpec, AnimationStateSpec, AnimationEventSpec, TransitionSpec, ParamTest, LoopMode, ClipInfo, Fade, AnimationSink } from './graph.ts'
-export { SpriteAnimationPlugin, SpriteAnimator, SpriteAnimation, spriteAnimator, spriteSheet, SpriteSheets, SpriteSheetStore, AnimateSprites } from './sprite.ts'
+export { SpriteAnimationPlugin, SpriteAnimator, SpriteAnimation, spriteAnimator, spriteSheet, frameUvs, SpriteSheets, SpriteSheetStore, AnimateSprites } from './sprite.ts'
 export type { SpriteSheet, SpriteSheetSpec, SpriteClipSpec, SpriteAnimatorOptions, AtlasRect } from './sprite.ts'
 export { SkeletalAnimationPlugin, Animator, ModelAnimation, animator, Mixers, MixerStore, AnimateModels } from './skeletal.ts'
 export type { AnimatorOptions } from './skeletal.ts'
