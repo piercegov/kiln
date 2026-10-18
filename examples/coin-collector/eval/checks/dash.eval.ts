@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { IsPlayer, Level } from '../../src/data.ts'
 import { PLAYER_SPEED } from '../../src/systems.ts'
 

@@ -86,7 +86,7 @@ objects), `InstanceSync`, then `Draw`. A camera or posing system that reads inte
 and must land in this frame's draw goes between them:
 
 ```ts
-import { Draw, Render, RenderSync } from 'kiln'
+import { Draw, Render, RenderSync } from 'kiln-ecs'
 
 app.add(Render, FollowCamera.after(RenderSync).before(Draw))
 ```

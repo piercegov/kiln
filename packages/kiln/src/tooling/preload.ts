@@ -1,6 +1,6 @@
 /**
  * Bun preload: registers the names transform for every .ts file outside node_modules.
- * Add to bunfig.toml: `[test] preload = ["kiln/preload"]`.
+ * Add to bunfig.toml: `[test] preload = ["kiln-ecs/preload"]`.
  */
 import { plugin } from 'bun'
 import { addNames } from './names.ts'

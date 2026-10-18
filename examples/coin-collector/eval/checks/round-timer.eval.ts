@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { IsPlayer } from '../../src/data.ts'
 
 async function load() {

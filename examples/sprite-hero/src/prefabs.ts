@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Lifetime, MeshRef, prefab, spriteAnimator, Transform } from 'kiln'
+import { Lifetime, MeshRef, prefab, spriteAnimator, Transform } from 'kiln-ecs'
 import { HeroAnim, HeroSheet, IsDummy, IsHero, Velocity } from './data.ts'
 
 /** The hero standing at `x` on the ground, in front of the dummies (z is draw order). */

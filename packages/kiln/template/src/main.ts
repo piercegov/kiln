@@ -1,4 +1,4 @@
-import { chain, createApp, CorePlugins, Fixed, Startup } from 'kiln'
+import { chain, createApp, CorePlugins, Fixed, Startup } from 'kiln-ecs'
 import config from '../kiln.config.ts'
 import { Movement, PlayerMove, SpawnLevel } from './systems.ts'
 

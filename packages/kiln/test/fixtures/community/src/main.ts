@@ -1,4 +1,4 @@
-import { createApp, CorePlugins, Startup, system, Transform } from 'kiln'
+import { createApp, CorePlugins, Startup, system, Transform } from 'kiln-ecs'
 import { CameraFollow, OrbitCamera, OrbitCameraPlugin } from '../../../../community/orbit-camera/index.ts'
 import { Water, WaterPlugin } from '../../../../community/water/index.ts'
 import { Terrain, terrainHeightAt, TerrainPlugin } from '../../../../community/terrain/index.ts'

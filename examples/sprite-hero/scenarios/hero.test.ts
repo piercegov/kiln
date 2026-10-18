@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { AnimationEvent, AnimationStateChanged, MeshRef, SpriteAnimator, Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { AnimationEvent, AnimationStateChanged, MeshRef, SpriteAnimator, Transform } from 'kiln-ecs'
 import { Hits, IsDummy, IsHero } from '../src/data.ts'
 
 const hero = (app: Parameters<Parameters<typeof scenario>[1]>[0]['app']) => app.query(IsHero)[0]!

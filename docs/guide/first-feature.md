@@ -12,7 +12,7 @@ a health bar, and despawning at zero. Every snippet here runs as written on top 
 Traits and events go in `src/data.ts`, each with a one-line JSDoc:
 
 ```ts
-import { event, trait, type Entity } from 'kiln'
+import { event, trait, type Entity } from 'kiln-ecs'
 
 /** Hit points. */
 // A struct trait: these numbers are the defaults, overridable per entity with Health({ hp: 5 }).
@@ -144,8 +144,8 @@ command would stop with an error naming both and the fix.
 `scenarios/hazard.test.ts`:
 
 ```ts
-import { expect, scenario } from 'kiln/test'
-import { Transform, Ui } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform, Ui } from 'kiln-ecs'
 import { Damaged, Hazard, Health, IsPlayer } from '../src/data.ts'
 
 scenario('standing in a hazard costs 1 hp per second, then the player despawns', ({ app }) => {

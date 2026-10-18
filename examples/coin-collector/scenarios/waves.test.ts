@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { IsCoin, IsPlayer, Level, Score, WaveCleared } from '../src/data.ts'
 
 scenario('clearing a wave spawns the next one with two more coins', ({ app }) => {

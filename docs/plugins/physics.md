@@ -4,11 +4,18 @@ description: "Rapier rigid bodies and colliders synced to Transform, collisions,
 
 # Physics
 
-`kiln/physics` wraps [Rapier](https://rapier.rs) 0.21: Rapier 3D by default, Rapier 2D when the app is
+`kiln-ecs/physics` wraps [Rapier](https://rapier.rs) 0.21: Rapier 3D by default, Rapier 2D when the app is
 `mode: '2d'`. Bodies are synced to `Transform`, and the simulation steps in `Fixed`.
 
+Rapier is an optional peer dependency, so games that don't use physics don't download it. Install
+the one your mode needs:
+
+```bash
+bun add @dimforge/rapier3d-compat@0.21.0   # or @dimforge/rapier2d-compat@0.21.0 for mode: '2d'
+```
+
 ```ts
-import { PhysicsPlugin, RigidBody, Collider } from 'kiln/physics'
+import { PhysicsPlugin, RigidBody, Collider } from 'kiln-ecs/physics'
 
 app.use(CorePlugins, PhysicsPlugin)
 

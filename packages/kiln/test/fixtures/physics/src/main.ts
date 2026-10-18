@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { createApp, CorePlugins, defineInstanced, Instanced, InstanceColor, MeshRef, Rng, Startup, system, Transform } from 'kiln'
-import { Collider, PhysicsPlugin, RigidBody } from 'kiln/physics'
+import { createApp, CorePlugins, defineInstanced, Instanced, InstanceColor, MeshRef, Rng, Startup, system, Transform } from 'kiln-ecs'
+import { Collider, PhysicsPlugin, RigidBody } from 'kiln-ecs/physics'
 
 defineInstanced('crate', { geometry: new THREE.BoxGeometry(0.5, 0.5, 0.5), material: new THREE.MeshStandardMaterial() })
 

@@ -12,7 +12,7 @@ Kiln re-exports Koota's `trait`, `relation`, `Not` and `Or` as they are, and wra
 ## Traits
 
 ```ts
-import { trait } from 'kiln'
+import { trait } from 'kiln-ecs'
 
 /** Linear velocity in world units per second. */
 export const Velocity = trait({ x: 0, y: 0, z: 0 })   // struct of arrays

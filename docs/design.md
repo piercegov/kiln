@@ -22,7 +22,7 @@ This page records how the implementation maps to it, and where it deliberately d
 - **Write checks**: `Mut()` types make undeclared row writes compile errors; in dev, row views throw
   on read-only writes, `entity.set` checks the system's `Mut` set, `entity.get` copies of struct traits
   throw on write, and structural entity calls inside systems throw with the `commands` fix.
-- **Names** come from exports through a runtime transform (`kiln/preload` for Bun, `kiln/vite` for
+- **Names** come from exports through a runtime transform (`kiln-ecs/preload` for Bun, `kiln-ecs/vite` for
   the browser) that wraps `const X = system(...)` as `__kiln_named("X", system(...))`.
 - **Events** are double-buffered per phase block: a whole frame's Fixed steps count as one run, so
   every reader sees every event exactly once however many steps a frame runs. `app.events(E)` reads a

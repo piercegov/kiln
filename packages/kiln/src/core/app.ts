@@ -865,7 +865,7 @@ export class App {
   get input(): InputController {
     const c = this.ext.input as InputController | undefined
     if (!c) {
-      throw new KilnError('no-input-plugin', 'app.input needs the input plugin. Add .use(CorePlugins) (or InputPlugin from kiln/input).')
+      throw new KilnError('no-input-plugin', 'app.input needs the input plugin. Add .use(CorePlugins) (or InputPlugin from kiln-ecs/input).')
     }
     return c
   }

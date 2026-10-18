@@ -49,7 +49,7 @@ Tests share one `memoryStorage()` between two apps to check that data survives a
 
 ```ts
 import { test } from 'bun:test'
-import { expect, scenarioApp } from 'kiln/test'
+import { expect, scenarioApp } from 'kiln-ecs/test'
 
 test('the best score survives a restart', async () => {
   const storage = memoryStorage()

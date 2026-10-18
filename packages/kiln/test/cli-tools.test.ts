@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { collectDocs, renderGameSection, START, END } from '../src/cli/docs.ts'
 import { listPlugins } from '../src/cli/add.ts'
+import { kilnDependency } from '../src/cli/new.ts'
 
 const pkg = `${import.meta.dir}/..`
 const example = `${import.meta.dir}/../../../examples/coin-collector`
@@ -48,13 +49,21 @@ describe('kiln new', () => {
       await $`bun ${pkg}/src/cli/kiln.ts new ${dest}`.quiet()
       const p = JSON.parse(readFileSync(join(dest, 'package.json'), 'utf8'))
       expect(p.name).toBe('my-game')
-      expect(p.dependencies.kiln.startsWith('file:')).toBe(true)
+      expect(p.dependencies['kiln-ecs'].startsWith('file:')).toBe(true)
       for (const f of ['src/main.ts', 'kiln.config.ts', 'scenarios/player.test.ts', 'AGENTS.md', 'index.html']) expect(existsSync(join(dest, f))).toBe(true)
       const again = await $`bun ${pkg}/src/cli/kiln.ts new ${dest} --json`.nothrow().quiet()
       expect(JSON.parse(again.stdout.toString()).error.code).toBe('not-empty')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+describe('kilnDependency', () => {
+  test('a registry install pins its own version, a checkout links back to itself', () => {
+    expect(kilnDependency('/home/me/.npm/_npx/ab12/node_modules/kiln-ecs', '/home/me/my-game', '0.2.0')).toBe('^0.2.0')
+    expect(kilnDependency('/src/kiln/packages/kiln', '/src/kiln/examples/new-game', '0.2.0')).toBe('workspace:*')
+    expect(kilnDependency('/src/kiln/packages/kiln', '/src/my-game', '0.2.0')).toBe('file:../kiln/packages/kiln')
   })
 })
 

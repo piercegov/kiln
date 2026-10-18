@@ -52,7 +52,7 @@ const MODULE_SCRIPT_RE = /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*>[\s\S
  */
 export function shotPage(entry: string, indexHtml?: string): string {
   const runner = `<script type="module">
-import { shot } from 'kiln/browser'
+import { shot } from 'kiln-ecs/browser'
 import main from '/${entry}'
 shot(main, document.querySelector('canvas'))
 </script>`

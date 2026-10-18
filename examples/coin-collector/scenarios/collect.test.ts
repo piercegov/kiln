@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { CoinCollected, IsCoin, IsPlayer, Score } from '../src/data.ts'
 
 scenario('walking onto a coin collects it', ({ app }) => {

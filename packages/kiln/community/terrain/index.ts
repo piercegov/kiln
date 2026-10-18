@@ -1,6 +1,6 @@
 // Procedural heightfield terrain from seeded value noise. Vendored by `kiln add terrain`.
 import * as THREE from 'three'
-import { KilnError, MeshRef, Not, plugin, system, trait, Update } from 'kiln'
+import { KilnError, MeshRef, Not, plugin, system, trait, Update } from 'kiln-ecs'
 
 /**
  * A square heightfield centred on the entity: `commands.spawn(Transform, Terrain({ size: 80, height: 6, seed: 7 }))`.

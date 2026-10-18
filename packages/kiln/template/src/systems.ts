@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Input, MeshRef, Mut, origin, system, Transform } from 'kiln'
+import { Input, MeshRef, Mut, origin, system, Transform } from 'kiln-ecs'
 import { IsPlayer, Velocity } from './data.ts'
 import { Player } from './prefabs.ts'
 

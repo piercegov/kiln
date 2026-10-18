@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { MeshRef, prefab, Transform, type Vec3 } from 'kiln'
+import { MeshRef, prefab, Transform, type Vec3 } from 'kiln-ecs'
 import { IsPlayer, Velocity } from './data.ts'
 
 /** The player: a box at `at`. */

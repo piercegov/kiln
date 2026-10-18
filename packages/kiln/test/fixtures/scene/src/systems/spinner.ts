@@ -1,4 +1,4 @@
-import { Mut, setYaw, system, Transform } from 'kiln'
+import { Mut, setYaw, system, Transform } from 'kiln-ecs'
 import { Spin } from '../traits.ts'
 
 /** Spins entities about Y. */

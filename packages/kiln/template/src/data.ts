@@ -1,4 +1,4 @@
-import { trait } from 'kiln'
+import { trait } from 'kiln-ecs'
 
 // Traits
 

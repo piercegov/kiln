@@ -60,7 +60,7 @@ replay threw.
 Once the bug is understood, keep the recording as a regression test that fails until the fix lands:
 
 ```ts
-import { expect, replay } from 'kiln/test'
+import { expect, replay } from 'kiln-ecs/test'
 
 replay('coin pickup no longer double-counts', 'recordings/double-coin.json', ({ app, result }) => {
   expect(app.res(Score).value).toBe(3)      // the app is live after the last frame: step it, query it

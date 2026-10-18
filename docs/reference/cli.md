@@ -106,12 +106,12 @@ To shoot something other than the opening screen, in the order they run:
 | Flag | |
 |---|---|
 | `--recording rec.json` | Replays a [recording](../testing/recordings) from boot, up to frame `--until N` (default: its end). `--steps` defaults to 0 after it, so the shot is the recorded frame |
-| `--setup file.ts` | A module whose default export runs on the started app: `(app) => void \| Promise<void>` (type `ShotSetup` from `kiln/browser`). Spawn things, set states and resources, script input, `app.step(n)` |
+| `--setup file.ts` | A module whose default export runs on the started app: `(app) => void \| Promise<void>` (type `ShotSetup` from `kiln-ecs/browser`). Spawn things, set states and resources, script input, `app.step(n)` |
 | `--input script` | An [input script](../plugins/input#scripted-input), as a JSON file or inline (`'[{"frame":1,"tap":"jump"}]'`), queued before the steps |
 
 ```ts
 // shots/boss.ts
-import type { ShotSetup } from 'kiln/browser'
+import type { ShotSetup } from 'kiln-ecs/browser'
 import { Score } from '../src/data.ts'
 
 const setup: ShotSetup = (app) => {

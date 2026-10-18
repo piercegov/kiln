@@ -18,8 +18,8 @@ AGENTS.md                the Kiln guide plus a generated section for this game
 ```
 
 Start with these few files and split one only when it gets long (`src/systems/combat.ts`,
-`src/systems/ui.ts`, ...). Import everything from `'kiln'`; physics comes from `'kiln/physics'` and
-test helpers from `'kiln/test'`.
+`src/systems/ui.ts`, ...). Import everything from `'kiln-ecs'`; physics comes from `'kiln-ecs/physics'` and
+test helpers from `'kiln-ecs/test'`.
 
 ## The entry module
 
@@ -56,7 +56,7 @@ name.
 
 A small runtime transform does the naming: it rewrites
 `const X = system(...)` into `const X = __kiln_named("X", system(...))`. The `kiln()` Vite plugin
-applies it in the browser and `kiln/preload` applies it under Bun (the template's `bunfig.toml`
+applies it in the browser and `kiln-ecs/preload` applies it under Bun (the template's `bunfig.toml`
 preloads it for `bun test`). Types are untouched. Two consequences:
 
 - Moving code between files changes nothing. Kiln never names things after their file.
@@ -88,7 +88,7 @@ that also defines a trait, resource, event, prefab or plugin reloads the app ins
 `kiln.config.ts` default-exports a config object:
 
 ```ts
-import { defineConfig } from 'kiln'
+import { defineConfig } from 'kiln-ecs'
 
 export default defineConfig({
   fixedHz: 60,

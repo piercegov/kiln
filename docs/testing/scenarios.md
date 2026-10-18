@@ -9,8 +9,8 @@ A scenario is a headless test of the real game. It builds a fresh app from `src/
 run under `bun test`; `kiln test` runs every file in `scenarios/`.
 
 ```ts
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { Player } from '../src/prefabs.ts'
 
 scenario('player walks right', ({ app }) => {      // fresh app, Startup already run
@@ -36,7 +36,7 @@ finished, so every run is the same.
 | `app` | A factory to build the app instead of the game's entry |
 | `timeout` | Test timeout in ms |
 
-`scenario.only` and `scenario.skip` work like `test.only` and `test.skip`. `kiln/test` re-exports
+`scenario.only` and `scenario.skip` work like `test.only` and `test.skip`. `kiln-ecs/test` re-exports
 `expect` and `describe` from `bun:test`.
 
 ## The app in tests

@@ -1,4 +1,4 @@
-import { CameraRig, CameraShake, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform, Tweens, Ui, UiClick } from 'kiln'
+import { CameraRig, CameraShake, clamp, distSq, Input, Mut, origin, Rng, setYaw, system, Transform, Tweens, Ui, UiClick } from 'kiln-ecs'
 import { Best, Bob, CoinCollected, IsCoin, IsPlayer, Level, Score, Screen, Spin, Velocity, WaveCleared } from './data.ts'
 import { Ground, Player, spawnCoins } from './prefabs.ts'
 

@@ -44,7 +44,7 @@ file swaps those systems in place and keeps the world; a file that also defines 
 event, prefab or plugin reloads the app instead.
 
 Every export gets a one-line JSDoc (`/** ... */`): it is the documentation, and `kiln docs` copies it
-here. Import everything from `'kiln'` (physics from `'kiln/physics'`, tests from `'kiln/test'`).
+here. Import everything from `'kiln-ecs'` (physics from `'kiln-ecs/physics'`, tests from `'kiln-ecs/test'`).
 
 ## Core API
 
@@ -56,12 +56,12 @@ import { trait, relation, Not, Or, Changed, Added, Removed, Mut, system, chain, 
   CameraPlugin, CameraTarget, CameraShake, CameraRig, savePlugin, Saves, animationGraph,
   SpriteAnimationPlugin, spriteSheet, spriteAnimator, SpriteAnimator, AnimateSprites,
   SkeletalAnimationPlugin, animator, Animator, AnimateModels, AnimationEvent,
-  setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln'
+  setYaw, setEuler, distSq, vec3, origin, type Entity } from 'kiln-ecs'
 ```
 
 `CorePlugins` = core (Time, Rng), render, input, assets, timers, tweens, HUD/UI, debug. Add
 `CameraPlugin`, `savePlugin({...})`, `SpriteAnimationPlugin`, `SkeletalAnimationPlugin` and
-`PhysicsPlugin` (from `'kiln/physics'`) when you need them.
+`PhysicsPlugin` (from `'kiln-ecs/physics'`) when you need them.
 
 | Helper | Use |
 |---|---|
@@ -345,7 +345,7 @@ for (const ev of events.read(AnimationEvent)) if (ev.name === 'hitFrame') { /* e
   each entity has its own AnimationMixer, stopped and uncached on despawn. Animators show in
   `kiln run --snapshot SpriteAnimator` but aren't saved: re-add them on `Loaded`.
 
-## Physics (`kiln/physics`, Rapier)
+## Physics (`kiln-ecs/physics`, Rapier)
 
 ```ts
 app.use(CorePlugins, PhysicsPlugin)
@@ -365,8 +365,8 @@ positions go `.after(WriteBackTransforms)`.
 ## Testing
 
 ```ts
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { Player } from '../src/prefabs.ts'
 
 scenario('player walks right', ({ app }) => {      // fresh app from src/main.ts, Startup already run
@@ -411,7 +411,7 @@ null` on unchanged code means the headless replay is the session; investigate it
 keep it as a regression test that fails until the fix lands:
 
 ```ts
-import { expect, replay } from 'kiln/test'
+import { expect, replay } from 'kiln-ecs/test'
 
 replay('coin pickup no longer double-counts', 'recordings/double-coin.json', ({ app, result }) => {
   expect(app.res(Score).value).toBe(3)      // the app is live after the last frame: step it, query it

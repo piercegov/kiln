@@ -7,7 +7,7 @@ description: "Every kiln.config.ts field, overrides, and the Vite and Bun setup.
 `kiln.config.ts` at the game root default-exports the config. `defineConfig` only adds types:
 
 ```ts
-import { defineConfig } from 'kiln'
+import { defineConfig } from 'kiln-ecs'
 
 export default defineConfig({
   fixedHz: 60,
@@ -49,7 +49,7 @@ config. Overrides apply inside `createApp`, so they reach the app however `main.
 
 ```ts
 import { defineConfig } from 'vite'
-import { kiln } from 'kiln/vite'
+import { kiln } from 'kiln-ecs/vite'
 
 export default defineConfig({ plugins: [kiln()] })
 ```
@@ -66,5 +66,5 @@ lights ("Light node not found"). Pass `kiln({ entry })` if the entry isn't `src/
 
 ```toml
 [test]
-preload = ["kiln/preload"]
+preload = ["kiln-ecs/preload"]
 ```

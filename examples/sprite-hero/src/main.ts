@@ -1,4 +1,4 @@
-import { AnimateSprites, chain, createApp, CorePlugins, Fixed, SpriteAnimationPlugin, Startup, Update } from 'kiln'
+import { AnimateSprites, chain, createApp, CorePlugins, Fixed, SpriteAnimationPlugin, Startup, Update } from 'kiln-ecs'
 import config from '../kiln.config.ts'
 import { DummyHit, Hits } from './data.ts'
 import { FootstepDust, HeroControl, Physics, SpawnLevel, SwordHits, UpdateHud, WobbleDummies } from './systems.ts'

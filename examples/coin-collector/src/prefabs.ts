@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { CameraTarget, MeshRef, prefab, SharedMesh, Transform, type Commands, type RngState, type TweenManager, type Vec3 } from 'kiln'
+import { CameraTarget, MeshRef, prefab, SharedMesh, Transform, type Commands, type RngState, type TweenManager, type Vec3 } from 'kiln-ecs'
 import { Bob, IsCoin, IsPlayer, Spin, Velocity } from './data.ts'
 
 /** The arena floor, `size` units across, with a grid on top. */

@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { createApp, CorePlugins, Fixed, MeshRef, prefab, Startup, system, Transform } from 'kiln'
+import { createApp, CorePlugins, Fixed, MeshRef, prefab, Startup, system, Transform } from 'kiln-ecs'
 import { Spinner } from './systems/spinner.ts'
 import { Spin } from './traits.ts'
 import config from '../kiln.config.ts'

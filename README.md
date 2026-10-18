@@ -6,6 +6,10 @@ scheduling line, and verify it headlessly.
 
 [![Docs](https://img.shields.io/badge/docs-read%20online-orange?style=for-the-badge&logo=readthedocs&logoColor=white)](https://kilnjs.pages.dev)
 
+```bash
+bunx kiln-ecs new my-game    # a playable starter game; npm package kiln-ecs, command kiln
+```
+
 ```ts
 // src/systems.ts
 /** Integrates Velocity into Transform. */
@@ -40,14 +44,14 @@ kiln docs         # AGENTS.md from the code and its JSDoc
 - Opt-in plugins: `CameraPlugin` (follow, bounds, zoom, trauma shake; 2D and 3D), `savePlugin` (save slots
   and persisted settings), `SpriteAnimationPlugin` (sprite sheets and atlases), `SkeletalAnimationPlugin`
   (glTF models), both driven by an animation graph with crossfades and frame events, and Rapier physics
-  (`kiln/physics`).
+  (`kiln-ecs/physics`).
 - Session recording: press F8 in the dev server to save a play session, then `kiln replay` it headless to
   find where the current code stops matching it.
 - Community plugins via `kiln add`: audio, orbit-camera, particles, terrain, water.
 
 ## Repo
 
-- `packages/kiln`: the framework (`kiln`, `kiln/physics`, `kiln/test`, `kiln/vite`, `kiln/browser`), the CLI,
+- `packages/kiln`: the framework (`kiln-ecs`, `kiln-ecs/physics`, `kiln-ecs/test`, `kiln-ecs/vite`, `kiln-ecs/browser`), the CLI,
   community plugins for `kiln add`, and the `kiln new` template.
 - `examples/coin-collector`: a 3D sample game (states, pause menu, tweens, camera follow, saved best score),
   with `eval/` tasks for measuring agents.
@@ -64,4 +68,6 @@ bun run typecheck
 cd examples/coin-collector && bunx vite     # play it (or examples/sprite-hero)
 ```
 
-Start a game: `bun packages/kiln/src/cli/kiln.ts new ../my-game`.
+Start a game from the checkout: `bun packages/kiln/src/cli/kiln.ts new ../my-game`.
+
+Build the npm package: `cd packages/kiln && bun run build` writes `dist/`, which is what gets published as `kiln-ecs`.

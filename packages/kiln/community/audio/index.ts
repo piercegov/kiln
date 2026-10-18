@@ -1,6 +1,6 @@
 // Positional sounds tied to Transform, on Web Audio via Three.js. Vendored by `kiln add audio`.
 import * as THREE from 'three'
-import { Camera, event, plugin, resource, Scene, system, trait, Transform, Update, type App, type Entity } from 'kiln'
+import { Camera, event, plugin, resource, Scene, system, trait, Transform, Update, type App, type Entity } from 'kiln-ecs'
 
 /**
  * A looping or one-time sound at this entity's Transform:

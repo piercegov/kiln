@@ -9,7 +9,7 @@ happened. What to do." The CLI prints them as `error <code>: <message>`, and `--
 the code. Most of the time the right move is to do what the message says.
 
 ```ts
-import { KilnError } from 'kiln'
+import { KilnError } from 'kiln-ecs'
 
 try { app.step() } catch (err) {
   if (err instanceof KilnError && err.code === 'not-ready') await app.ready()

@@ -2,7 +2,7 @@
 import * as THREE from 'three'
 import { MeshStandardNodeMaterial } from 'three/webgpu'
 import { cos, mix, normalize, positionGeometry, sin, smoothstep, transformNormalToView, uniform, varying, vec3 } from 'three/tsl'
-import { KilnError, MeshRef, Not, plugin, system, trait, Update } from 'kiln'
+import { KilnError, MeshRef, Not, plugin, system, trait, Update } from 'kiln-ecs'
 
 /**
  * A water plane: `commands.spawn(Transform({ y: 0.2 }), Water({ size: 60, waveHeight: 0.3 }))`.

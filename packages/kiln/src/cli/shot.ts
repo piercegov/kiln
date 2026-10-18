@@ -89,7 +89,7 @@ export default async function shot(args: Args, root: string): Promise<number> {
   const steps = num(args.steps, plan.recording ? 0 : 60)
   const width = num(args.width, 800)
   const height = num(args.height, 600)
-  const { createServer } = await import('vite')
+  const { createServer } = await optional<typeof import('vite')>('vite', () => import('vite'))
   const { kiln } = await import('../tooling/vite.ts')
   const hasConfig = ['vite.config.ts', 'vite.config.js', 'vite.config.mjs'].some((f) => existsSync(join(root, f)))
   const server = await createServer({
@@ -103,7 +103,7 @@ export default async function shot(args: Args, root: string): Promise<number> {
   await server.listen()
   const addr = server.httpServer?.address()
   const port = typeof addr === 'object' && addr ? addr.port : 5173
-  const { chromium } = await import('playwright-core')
+  const { chromium } = await optional<typeof import('playwright-core')>('playwright-core', () => import('playwright-core'))
   const executablePath = findChromium(chromium)
   if (!executablePath) {
     await server.close()
@@ -148,5 +148,14 @@ export default async function shot(args: Args, root: string): Promise<number> {
   } finally {
     await browser.close()
     await server.close()
+  }
+}
+
+/** An optional peer dependency kiln shot needs; a KilnError naming the install if it's missing. */
+async function optional<T>(pkg: string, load: () => Promise<T>): Promise<T> {
+  try {
+    return await load()
+  } catch (cause) {
+    throw new KilnError('missing-dependency', `kiln shot needs ${pkg}, which isn't installed. Run: bun add -d ${pkg}`, { cause })
   }
 }

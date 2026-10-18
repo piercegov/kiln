@@ -8,7 +8,7 @@
     "examples/coin-collector": {
       "name": "coin-collector",
       "dependencies": {
-        "kiln": "workspace:*",
+        "kiln-ecs": "workspace:*",
         "three": "0.186.1",
       },
       "devDependencies": {
@@ -18,7 +18,7 @@
     "examples/sprite-hero": {
       "name": "sprite-hero",
       "dependencies": {
-        "kiln": "workspace:*",
+        "kiln-ecs": "workspace:*",
         "three": "0.186.1",
       },
       "devDependencies": {
@@ -29,27 +29,38 @@
       },
     },
     "packages/kiln": {
-      "name": "kiln",
+      "name": "kiln-ecs",
       "version": "0.1.0",
       "bin": {
         "kiln": "./src/cli/kiln.ts",
       },
       "dependencies": {
-        "@dimforge/rapier2d-compat": "0.21.0",
-        "@dimforge/rapier3d-compat": "0.21.0",
         "koota": "0.6.6",
-        "playwright-core": "1.64.1",
         "tweakpane": "4.0.5",
-        "vite": "8.3.4",
       },
       "devDependencies": {
+        "@dimforge/rapier2d-compat": "0.21.0",
+        "@dimforge/rapier3d-compat": "0.21.0",
         "@types/bun": "1.4.3",
         "@types/three": "0.186.0",
+        "playwright-core": "1.64.1",
+        "three": "0.186.1",
         "typescript": "5",
+        "vite": "8.3.4",
       },
       "peerDependencies": {
+        "@dimforge/rapier2d-compat": "0.21.0",
+        "@dimforge/rapier3d-compat": "0.21.0",
+        "playwright-core": "1.64.1",
         "three": "0.186.1",
+        "vite": "8.3.4",
       },
+      "optionalPeers": [
+        "@dimforge/rapier2d-compat",
+        "@dimforge/rapier3d-compat",
+        "playwright-core",
+        "vite",
+      ],
     },
   },
   "packages": {
@@ -115,7 +126,7 @@
 
     "fsevents": ["fsevents@2.3.3", "", { "os": "darwin" }, "sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw=="],
 
-    "kiln": ["kiln@workspace:packages/kiln"],
+    "kiln-ecs": ["kiln-ecs@workspace:packages/kiln"],
 
     "koota": ["koota@0.6.6", "", { "peerDependencies": { "@types/react": ">=18.0.0", "react": ">=18.0.0" }, "optionalPeers": ["@types/react", "react"] }, "sha512-Fn8lSooH3u9TIP+eAMugFrOju40Ec70+sB7x1eZBB3H0Lki2hyIbFAodk3NDB/RIRzoMs54O4422BVN6SbtWfw=="],
 

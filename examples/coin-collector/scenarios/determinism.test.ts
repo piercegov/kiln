@@ -1,5 +1,5 @@
-import { expect, scenario, scenarioApp } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario, scenarioApp } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { IsCoin } from '../src/data.ts'
 
 const script = [

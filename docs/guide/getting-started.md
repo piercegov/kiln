@@ -10,35 +10,38 @@ description: "Create a game with kiln new, run it, read its schedule and run its
 - A browser with WebGPU or WebGL2 to play. `kiln shot` needs a Chromium: Playwright's, or any
   Chrome binary named by `KILN_CHROMIUM`.
 
-Kiln isn't published to npm yet. From a checkout of the Kiln repository:
-
-```bash
-bun install
-bun test
-```
-
 ## Create a game
 
 `kiln new` copies the starter template into a new folder and writes an `AGENTS.md`:
 
 ```bash
-bun packages/kiln/src/cli/kiln.ts new ../my-game
-cd ../my-game
+bunx kiln-ecs new my-game
+cd my-game
 bun install
 ```
 
-Outside the Kiln repo the game depends on your checkout through a `file:` path. Created inside
-`examples/`, it joins the workspace instead.
-
-Inside the game the `kiln` command comes from the `kiln` package, so run it with `bunx kiln ...` or
-through the package scripts (`bun run test`, `bun run describe`, `bun run docs`). The rest of these
+The package is `kiln-ecs` on npm; its command is `kiln`. Inside the game, run it through the package
+scripts (`bun run test`, `bun run describe`, `bun run docs`) or as `bunx kiln ...`. The rest of these
 docs write it as plain `kiln`.
 
 ```bash
-bunx kiln docs       # add this game's schedule and exports to AGENTS.md
-bunx kiln test       # the template's scenario test
-bunx vite            # play it at http://localhost:5173
+bun run docs         # add this game's schedule and exports to AGENTS.md
+bun run test         # the template's scenario test
+bun run dev          # play it at http://localhost:5173
 ```
+
+### From a checkout
+
+To work on Kiln itself, clone the repository and start games from it:
+
+```bash
+bun install
+bun test
+bun packages/kiln/src/cli/kiln.ts new ../my-game
+```
+
+A game made from a checkout depends on it through a `file:` path, so changes to Kiln show up in the
+game. Created inside `examples/`, it joins the workspace instead.
 
 The starter is a blue box on a floor that moves with WASD, the arrow keys or a gamepad stick.
 
@@ -49,7 +52,7 @@ my-game/
   kiln.config.ts      fixedHz, seed, mode, hotReload
   index.html          a canvas and boot(main)
   vite.config.ts      the kiln() Vite plugin
-  bunfig.toml         preloads kiln/preload for bun test
+  bunfig.toml         preloads kiln-ecs/preload for bun test
   src/main.ts         default-exports () => createApp(config)...: the whole schedule
   src/data.ts         traits, resources and events
   src/prefabs.ts      spawn recipes
@@ -62,7 +65,7 @@ my-game/
 The schedule in `src/main.ts` is short:
 
 ```ts
-import { chain, createApp, CorePlugins, Fixed, Startup } from 'kiln'
+import { chain, createApp, CorePlugins, Fixed, Startup } from 'kiln-ecs'
 import config from '../kiln.config.ts'
 import { Movement, PlayerMove, SpawnLevel } from './systems.ts'
 
@@ -117,8 +120,8 @@ after a change: schedule errors show here before anything else.
 `scenarios/player.test.ts` holds the starter's one test:
 
 ```ts
-import { expect, scenario } from 'kiln/test'
-import { Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform } from 'kiln-ecs'
 import { IsPlayer } from '../src/data.ts'
 
 scenario('the player walks right while right is held', ({ app }) => {

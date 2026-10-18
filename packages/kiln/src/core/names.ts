@@ -2,7 +2,7 @@ import { $internal, $relation, type Trait } from 'koota'
 
 /**
  * Kiln names things after their export: `export const Movement = system(...)` is "Movement".
- * The names transform (kiln/vite, kiln/preload) appends `__kiln_name(Movement, "Movement")`
+ * The names transform (kiln-ecs/vite, kiln-ecs/preload) appends `__kiln_name(Movement, "Movement")`
  * to each module; `.named()` or a `name` option override it.
  */
 const names = new WeakMap<object, string>()

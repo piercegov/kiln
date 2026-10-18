@@ -1,0 +1,43 @@
+name: Publish
+
+# Publishes kiln-ecs to npm when a v* tag is pushed (git tag v0.1.0 && git push origin v0.1.0).
+# The tag must match packages/kiln/package.json's version.
+#
+# Uses npm trusted publishing (OIDC), so there is no npm token secret. One-time setup on npmjs.com,
+# after the first manual publish: kiln-ecs > Settings > Trusted publishing > GitHub Actions, with
+# repository piercegov/kiln and workflow publish.yml.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@^11.5.1
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun test
+      - name: Check the tag matches the package version
+        run: |
+          version=$(jq -r .version packages/kiln/package.json)
+          test "v$version" = "$GITHUB_REF_NAME" || { echo "Tag $GITHUB_REF_NAME doesn't match package.json version $version. Bump the version or retag."; exit 1; }
+      - run: bun run build
+        working-directory: packages/kiln
+      # The built package must load on Node, not only Bun.
+      - run: node -e "import('./packages/kiln/dist/lib/index.js').then((k) => k.createApp({}))"
+      - run: npm publish --access public
+        working-directory: packages/kiln/dist

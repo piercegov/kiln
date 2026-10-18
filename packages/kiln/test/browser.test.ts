@@ -33,7 +33,7 @@ describe('vite plugin', () => {
     const index = `<!doctype html><html><head><style>.card{color:red}</style><script>window.x=1</script></head>
 <body><div id="hud"></div><canvas id="game"></canvas>
 <script type="module">
-  import { boot } from 'kiln/browser'
+  import { boot } from 'kiln-ecs/browser'
   import main from './src/main.ts'
   boot(main)
 </script><script type="module" src="/src/extra.ts"></script></body></html>`

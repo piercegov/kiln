@@ -1,5 +1,5 @@
 // Orbit camera: drag to rotate, wheel to zoom, optionally follow an entity. Vendored by `kiln add orbit-camera`.
-import { Camera, clamp, Input, Mut, plugin, system, trait, Transform, Update } from 'kiln'
+import { Camera, clamp, Input, Mut, plugin, system, trait, Transform, Update } from 'kiln-ecs'
 
 /**
  * Orbit camera parameters. Put it on one entity (the first one found drives the Camera):

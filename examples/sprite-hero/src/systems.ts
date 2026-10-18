@@ -1,4 +1,4 @@
-import { ActionMap, AnimationEvent, Input, Mut, SpriteAnimator, system, Transform, Tweens, Ui } from 'kiln'
+import { ActionMap, AnimationEvent, Input, Mut, SpriteAnimator, system, Transform, Tweens, Ui } from 'kiln-ecs'
 import { DummyHit, Hits, IsDummy, IsHero, Velocity } from './data.ts'
 import { Dummy, Dust, Ground, Hero } from './prefabs.ts'
 

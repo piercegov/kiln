@@ -1,4 +1,4 @@
-import { createApp, CorePlugins, Fixed, Input, Mut, Startup, system, trait, Transform, Update } from 'kiln'
+import { createApp, CorePlugins, Fixed, Input, Mut, Startup, system, trait, Transform, Update } from 'kiln-ecs'
 
 export const IsPlayer = trait()
 export const Jumps = trait({ count: 0 })

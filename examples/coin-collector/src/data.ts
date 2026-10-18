@@ -1,4 +1,4 @@
-import { event, resource, state, trait, type Entity } from 'kiln'
+import { event, resource, state, trait, type Entity } from 'kiln-ecs'
 
 // Traits
 

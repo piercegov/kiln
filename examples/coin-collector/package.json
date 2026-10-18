@@ -10,7 +10,7 @@
     "docs": "kiln docs"
   },
   "dependencies": {
-    "kiln": "workspace:*",
+    "kiln-ecs": "workspace:*",
     "three": "0.186.1"
   },
   "devDependencies": {

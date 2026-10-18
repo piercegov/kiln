@@ -1,12 +1,12 @@
-// Names TypeDoc's modules after the import paths games use ('kiln/physics', not 'plugins/physics').
+// Names TypeDoc's modules after the import paths games use ('kiln-ecs/physics', not 'plugins/physics').
 import { Converter } from 'typedoc'
 
 const NAMES = {
-  index: 'kiln',
-  'plugins/physics': 'kiln/physics',
-  test: 'kiln/test',
-  'tooling/vite': 'kiln/vite',
-  browser: 'kiln/browser',
+  index: 'kiln-ecs',
+  'plugins/physics': 'kiln-ecs/physics',
+  test: 'kiln-ecs/test',
+  'tooling/vite': 'kiln-ecs/vite',
+  browser: 'kiln-ecs/browser',
 }
 
 /** @param {import('typedoc').Application} app */

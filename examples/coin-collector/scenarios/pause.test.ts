@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { Transform, Ui } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { Transform, Ui } from 'kiln-ecs'
 import { Best, IsCoin, IsPlayer, Score, Screen } from '../src/data.ts'
 
 scenario('pause freezes gameplay and shows a menu; Resume continues', ({ app }) => {

@@ -1,2 +1,2 @@
 [test]
-preload = ["kiln/preload"]
+preload = ["kiln-ecs/preload"]

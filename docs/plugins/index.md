@@ -7,8 +7,8 @@ description: "What is in CorePlugins, the opt-in plugins, and how to configure t
 Most of Kiln is plugins. `CorePlugins` is the set nearly every game uses; the rest are opt-in.
 
 ```ts
-import { createApp, CorePlugins, CameraPlugin, savePlugin, SpriteAnimationPlugin } from 'kiln'
-import { PhysicsPlugin } from 'kiln/physics'
+import { createApp, CorePlugins, CameraPlugin, savePlugin, SpriteAnimationPlugin } from 'kiln-ecs'
+import { PhysicsPlugin } from 'kiln-ecs/physics'
 
 createApp(config).use(CorePlugins, CameraPlugin, PhysicsPlugin)
 ```
@@ -37,7 +37,7 @@ starts on a canvas, and the debug panel does nothing headless or in production.
 | `savePlugin({ ... })` | `kiln` | [Saving](./save) |
 | `SpriteAnimationPlugin` | `kiln` | [Animation](./animation) |
 | `SkeletalAnimationPlugin` | `kiln` | [Animation](./animation) |
-| `PhysicsPlugin` / `physicsPlugin({ gravity })` | `kiln/physics` | [Physics](./physics) |
+| `PhysicsPlugin` / `physicsPlugin({ gravity })` | `kiln-ecs/physics` | [Physics](./physics) |
 
 The camera rig takes over the camera and saving needs configuration, so neither is on by default.
 
@@ -47,7 +47,7 @@ Several core plugins have a configurable form. Use it instead of the default in 
 listing the plugins yourself:
 
 ```ts
-import { CorePlugin, renderPlugin, inputPlugin, DEFAULT_ACTIONS, AssetsPlugin, TimerPlugin, TweenPlugin, UiPlugin, debugPlugin } from 'kiln'
+import { CorePlugin, renderPlugin, inputPlugin, DEFAULT_ACTIONS, AssetsPlugin, TimerPlugin, TweenPlugin, UiPlugin, debugPlugin } from 'kiln-ecs'
 
 createApp(config).use(
   CorePlugin,

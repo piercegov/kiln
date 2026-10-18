@@ -352,9 +352,20 @@ export interface PhysicsOptions {
 export function physicsPlugin(options: PhysicsOptions = {}): Plugin {
   return plugin(async (app: App) => {
     const is2D = app.config.mode === '2d'
-    const mod: any = is2D ? await import('@dimforge/rapier2d-compat') : await import('@dimforge/rapier3d-compat')
+    const pkg = is2D ? '@dimforge/rapier2d-compat' : '@dimforge/rapier3d-compat'
+    let mod: any
+    try {
+      mod = is2D ? await import('@dimforge/rapier2d-compat') : await import('@dimforge/rapier3d-compat')
+    } catch (cause) {
+      throw new KilnError('missing-rapier', `The physics plugin needs ${pkg}, which isn't installed. Run: bun add ${pkg}@0.21.0`, { cause })
+    }
     const R = mod.default ?? mod
     await R.init()
+    // @types/three pulls in an old rapier3d-compat, which would otherwise load in place of 0.21.
+    const v: string = typeof R.version === 'function' ? R.version() : '0.21'
+    if (!v.startsWith('0.21')) {
+      throw new KilnError('rapier-version', `The physics plugin needs ${pkg} 0.21, but ${v} is installed. Run: bun add ${pkg}@0.21.0`)
+    }
     const g = options.gravity ?? [0, -9.81, 0]
     const world = new R.World(is2D ? { x: g[0], y: g[1] } : { x: g[0], y: g[1], z: g[2] ?? 0 })
     const state = new PhysicsState(R, world, is2D)

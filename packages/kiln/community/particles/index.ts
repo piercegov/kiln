@@ -1,6 +1,6 @@
 // Visual-only particle emitters: one InstancedMesh per emitter. Vendored by `kiln add particles`.
 import * as THREE from 'three'
-import { plugin, Rng, RngState, Scene, system, trait, Transform, Update, type Entity } from 'kiln'
+import { plugin, Rng, RngState, Scene, system, trait, Transform, Update, type Entity } from 'kiln-ecs'
 
 /**
  * A particle emitter at this entity's Transform:

@@ -1,4 +1,4 @@
-import { CameraPlugin, chain, createApp, CorePlugins, Fixed, inState, runIf, savePlugin, Startup, Update } from 'kiln'
+import { CameraPlugin, chain, createApp, CorePlugins, Fixed, inState, runIf, savePlugin, Startup, Update } from 'kiln-ecs'
 import config from '../kiln.config.ts'
 import { Best, CoinCollected, Level, Score, Screen, WaveCleared } from './data.ts'
 import { ClampToArena, CollectCoins, Movement, NextWave, PlayerMove, SpawnLevel, Spinner, Bobber, TogglePause, TrackBest, UpdateHud } from './systems.ts'

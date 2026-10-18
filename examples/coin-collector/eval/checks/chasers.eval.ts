@@ -1,5 +1,5 @@
-import { expect, scenario } from 'kiln/test'
-import { distSq, Transform } from 'kiln'
+import { expect, scenario } from 'kiln-ecs/test'
+import { distSq, Transform } from 'kiln-ecs'
 import { IsPlayer, Level, Score } from '../../src/data.ts'
 
 async function load() {

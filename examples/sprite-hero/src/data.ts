@@ -1,4 +1,4 @@
-import { animationGraph, event, resource, spriteSheet, trait, type Entity } from 'kiln'
+import { animationGraph, event, resource, spriteSheet, trait, type Entity } from 'kiln-ecs'
 
 // Sprites
 

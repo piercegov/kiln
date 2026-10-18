@@ -1,5 +1,5 @@
 /**
- * The names transform, shared by kiln/vite and kiln/preload. Every
+ * The names transform, shared by kiln-ecs/vite and kiln-ecs/preload. Every
  * `const X = system|trait|resource|event|prefab|plugin|relation|state(...)`, at any depth, becomes
  * `const X = globalThis.__kiln_named("X", system(...))` (guarded), so Kiln can name things after their
  * export in errors, snapshots and `kiln describe`. It is a runtime transform only; types are
