@@ -255,7 +255,8 @@ every frame if that is simpler. Anchors: `top-left top top-right left center rig
 bottom-right`; options `size color order visible` (bars: `label width`; buttons: `action`).
 `ui.show(id, false)`, `ui.remove(id)`. Headless the same data exists, so tests assert
 `app.res(Ui).get('score')?.text` and press buttons with `app.res(Ui).click('menu.start')` (UiClick
-arrives on the next step). The DOM is drawn over the canvas, and `kiln shot` includes it.
+arrives on the next step). The DOM is drawn over the canvas, and `kiln shot` includes it, with the CSS from the game's
+`index.html`.
 
 ## Camera (`CameraPlugin`)
 

@@ -96,8 +96,10 @@ kiln shot [--steps N] [--seed S] [--setup file.ts] [--input script.json] [--reco
 ```
 
 Serves the game with Vite, opens it in headless Chromium, waits for Startup's asset loads, runs `N`
-fixed steps (default 60), renders one frame and saves it (default `shot.png`, 800×600). The image is
-clipped to the canvas from the page, so the HUD is included.
+fixed steps (default 60), renders one frame and saves it (default `shot.png`, 800×600). The page is
+the game's own `index.html` with its module scripts replaced by the shot runner, so its CSS and
+markup apply as they do in the dev server. The image is clipped to the canvas from the page, so the
+HUD is included.
 
 To shoot something other than the opening screen, in the order they run:
 

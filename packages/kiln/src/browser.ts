@@ -208,7 +208,8 @@ export async function boot(main: MainFn, canvasArg?: HTMLCanvasElement | null): 
  * module, queue an input script, step N frames, render one frame, then signal Playwright. Params
  * come from the query string (steps, seed, webgl) and window.__KILN_SHOT__ (setup, input, recording).
  */
-export async function shot(main: MainFn, canvas: HTMLCanvasElement): Promise<void> {
+export async function shot(main: MainFn, canvasArg?: HTMLCanvasElement | null): Promise<void> {
+  const canvas = ensureCanvas(canvasArg)
   const q = new URLSearchParams(location.search)
   const steps = Number(q.get('steps') ?? 60)
   const w = Number(q.get('width') ?? 800)

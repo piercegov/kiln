@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { $ } from 'bun'
 import { existsSync, rmSync } from 'node:fs'
 import { resolveConfig } from 'vite'
-import { factoryKinds, kiln } from '../src/tooling/vite.ts'
+import { factoryKinds, kiln, shotPage } from '../src/tooling/vite.ts'
 import { shotPlan } from '../src/cli/shot.ts'
 import { parseArgs } from '../src/cli/args.ts'
 import { addNames } from '../src/tooling/names.ts'
@@ -27,6 +27,25 @@ describe('vite plugin', () => {
     expect(out).toContain(`const Movement = ${N}("Movement", system([Mut(Transform), trait()], ([t]) => { t.x += ")" + \`\${1}\` })).named("M2")`)
     expect(out).toContain('const R = /\\)/.test')
     expect(() => new Function(out.replace(/export /g, '').replace(/<\{ a: number \}>/, ''))).not.toThrow()
+  })
+
+  test("the shot page is the game's index.html with its boot script swapped for the shot runner", () => {
+    const index = `<!doctype html><html><head><style>.card{color:red}</style><script>window.x=1</script></head>
+<body><div id="hud"></div><canvas id="game"></canvas>
+<script type="module">
+  import { boot } from 'kiln/browser'
+  import main from './src/main.ts'
+  boot(main)
+</script><script type="module" src="/src/extra.ts"></script></body></html>`
+    const page = shotPage('src/main.ts', index)
+    expect(page).toContain('<style>.card{color:red}</style>')
+    expect(page).toContain('<script>window.x=1</script>')
+    expect(page).toContain('<div id="hud"></div><canvas id="game"></canvas>')
+    expect(page).not.toContain('boot(main)')
+    expect(page).not.toContain('extra.ts')
+    expect(page).toContain("shot(main, document.querySelector('canvas'))")
+    expect(page.indexOf('shot(main')).toBeLessThan(page.indexOf('</body>'))
+    expect(shotPage('src/main.ts')).toContain('<canvas id="kiln"></canvas>')
   })
 
   test('dedupes three and koota, so a linked kiln shares them with the game', async () => {

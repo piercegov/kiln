@@ -69,5 +69,6 @@ app.step(1)
 ```
 
 Clicking an id that isn't a button (not set yet, or misspelled) throws with the fix. `kiln shot`
-clips the page rather than the canvas, so the HUD is in the screenshot. Real clicks in the browser
+clips the page rather than the canvas, so the HUD is in the screenshot, styled by the game's
+`index.html` (the shot page is that file with its boot script swapped out). Real clicks in the browser
 are recorded, so [replays](../testing/recordings) reproduce them.

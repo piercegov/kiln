@@ -6,7 +6,8 @@
  *   kept). Any other change reaches the entry module, and the browser runtime then follows
  *   kiln.config.ts `hotReload`: 'snapshot' rebuilds the app and restores the last snapshot,
  *   'keep' and false reload the page.
- * - `/__kiln/shot` serves the page `kiln shot` screenshots.
+ * - `/__kiln/shot` serves the page `kiln shot` screenshots: the game's index.html (its styles and
+ *   markup) with its module scripts swapped for the shot runner.
  * - `POST /__kiln/recording?name=x` writes a session recording (F8 in the game) to recordings/x.json.
  * - Dedupes three and koota, so a game that installs kiln from outside its own node_modules (a
  *   file: or linked checkout) still shares one copy with it. Two copies of three break WebGPU
@@ -43,16 +44,27 @@ if (import.meta.hot) {
 }
 `
 
-function shotPage(entry: string): string {
+const MODULE_SCRIPT_RE = /<script\b[^>]*\btype\s*=\s*["']?module["']?[^>]*>[\s\S]*?<\/script\s*>/gi
+
+/**
+ * The shot page: the game's own index.html when it has one, so its CSS and HUD markup are in the
+ * shot, with its module scripts (the boot entry) replaced by the shot runner.
+ */
+export function shotPage(entry: string, indexHtml?: string): string {
+  const runner = `<script type="module">
+import { shot } from 'kiln/browser'
+import main from '/${entry}'
+shot(main, document.querySelector('canvas'))
+</script>`
+  if (indexHtml) {
+    const page = indexHtml.replace(MODULE_SCRIPT_RE, '')
+    return /<\/body\s*>/i.test(page) ? page.replace(/<\/body\s*>/i, `${runner}</body>`) : page + runner
+  }
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>kiln shot</title>
 <style>html,body{margin:0;background:#000}canvas{display:block}</style></head>
 <body><canvas id="kiln"></canvas>
-<script type="module">
-import { shot } from 'kiln/browser'
-import main from '/${entry}'
-shot(main, document.getElementById('kiln'))
-</script></body></html>`
+${runner}</body></html>`
 }
 
 export function kiln(options: KilnViteOptions = {}): Plugin {
@@ -96,7 +108,11 @@ export function kiln(options: KilnViteOptions = {}): Plugin {
       })
       s.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith('/__kiln/shot')) return next()
-        const html = await s.transformIndexHtml(req.url, shotPage(entry))
+        let index: string | undefined
+        try {
+          index = readFileSync(resolve(root, 'index.html'), 'utf8')
+        } catch {}
+        const html = await s.transformIndexHtml(req.url, shotPage(entry, index))
         res.setHeader('content-type', 'text/html')
         res.end(html)
       })
