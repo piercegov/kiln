@@ -13,6 +13,8 @@
     "./assets": "./src/plugins/assets/index.ts",
     "./debug": "./src/plugins/debug/index.ts",
     "./physics": "./src/plugins/physics/index.ts",
+    "./timer": "./src/plugins/timer/index.ts",
+    "./tween": "./src/plugins/tween/index.ts",
     "./test": "./src/test/index.ts",
     "./vite": "./src/tooling/vite.ts",
     "./preload": "./src/tooling/preload.ts",

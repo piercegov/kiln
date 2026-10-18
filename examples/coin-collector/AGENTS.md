@@ -288,7 +288,7 @@ commands.spawn(Transform, MeshRef(new THREE.Mesh(new THREE.PlaneGeometry(20, 20,
 ## This game
 
 Config: `mode: '3d'`, `fixedHz: 60`, `seed: 42`, `hotReload: "keep"`.
-Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, DebugPlugin.
+Plugins: CorePlugin, RenderPlugin, InputPlugin, AssetsPlugin, TimerPlugin, TweenPlugin, DebugPlugin.
 
 ### Schedule
 
@@ -310,13 +310,15 @@ Run order inside each phase (from `kiln describe`). Resource access is what one 
 
 | # | System | Writes | Reads | Resources | After | File |
 |---|---|---|---|---|---|---|
-| 1 | PlayerMove | Velocity | IsPlayer | Input | – | src/systems.ts |
-| 2 | Movement | Transform | Velocity | – | PlayerMove | src/systems.ts |
-| 3 | ClampToArena | Transform | IsPlayer | Level | Movement | src/systems.ts |
-| 4 | Spinner | Spin, Transform | – | – | ClampToArena | src/systems.ts |
-| 5 | Bobber | Transform | Bob | – | Spinner | src/systems.ts |
-| 6 | CollectCoins | – | IsCoin, IsPlayer, Transform | – | Bobber | src/systems.ts |
-| 7 | NextWave | – | – | – | CollectCoins | src/systems.ts |
+| 1 | TickTimers | Lifetime, Timer | – | Delayed | – | (kiln) |
+| 2 | TickTweens | – | – | Tweens | – | (kiln) |
+| 3 | PlayerMove | Velocity | IsPlayer | Input | – | src/systems.ts |
+| 4 | Movement | Transform | Velocity | – | PlayerMove | src/systems.ts |
+| 5 | ClampToArena | Transform | IsPlayer | Level | Movement | src/systems.ts |
+| 6 | Spinner | Spin, Transform | – | – | ClampToArena | src/systems.ts |
+| 7 | Bobber | Transform | Bob | – | Spinner | src/systems.ts |
+| 8 | CollectCoins | – | IsCoin, IsPlayer, Transform | – | Bobber | src/systems.ts |
+| 9 | NextWave | – | – | – | CollectCoins | src/systems.ts |
 
 **Update**
 

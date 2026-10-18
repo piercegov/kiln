@@ -107,7 +107,7 @@ describe('hot swap', () => {
     const Bad = system([Mut(Transform)], () => {}).named('Bad')
     const app2 = mk().add(Fixed, Movement, A)
     expect(() => app2.replaceSystem(A, Bad)).toThrow('Movement and Bad both take Mut(Transform)')
-    expect(app2.systemsIn(Fixed).map((s) => s.name)).toEqual(['Movement', 'A'])
+    expect(app2.systemsIn(Fixed).map((s) => s.name)).toEqual(['TickTimers', 'TickTweens', 'Movement', 'A'])
   })
 })
 
@@ -116,17 +116,17 @@ describe('describe', () => {
     const app = mk().add(Fixed, chain(Movement, A))
     const d = app.describe()
     const fixed = d.phases.find((p) => p.name === 'Fixed')!
-    expect(fixed.systems.map((s) => s.name)).toEqual(['Movement', 'A'])
-    expect(fixed.systems[0]!.writes).toEqual(['Transform'])
-    expect(fixed.systems[0]!.reads).toEqual(['Velocity'])
-    expect(fixed.systems[1]!.after).toEqual(['Movement'])
-    expect(d.plugins).toEqual(['CorePlugin', 'RenderPlugin', 'InputPlugin', 'AssetsPlugin', 'DebugPlugin'])
+    expect(fixed.systems.map((s) => s.name)).toEqual(['TickTimers', 'TickTweens', 'Movement', 'A'])
+    expect(fixed.systems[2]!.writes).toEqual(['Transform'])
+    expect(fixed.systems[2]!.reads).toEqual(['Velocity'])
+    expect(fixed.systems[3]!.after).toEqual(['Movement'])
+    expect(d.plugins).toEqual(['CorePlugin', 'RenderPlugin', 'InputPlugin', 'AssetsPlugin', 'TimerPlugin', 'TweenPlugin', 'DebugPlugin'])
   })
 
   test('kiln describe --json on a fixture game', async () => {
     const out = await $`bun src/cli/kiln.ts describe --json --cwd test/fixtures/game`.cwd(`${import.meta.dir}/..`).json()
     const fixed = out.phases.find((p: any) => p.name === 'Fixed')
-    expect(fixed.systems.map((s: any) => s.name)).toEqual(['Movement', 'CollectCoins'])
+    expect(fixed.systems.map((s: any) => s.name)).toEqual(['TickTimers', 'TickTweens', 'Movement', 'CollectCoins'])
     expect(out.phases[0].systems[0].resources.writes).toEqual(['Rng'])
     expect(out.traits.map((t: any) => t.name)).toContain('Velocity')
   })

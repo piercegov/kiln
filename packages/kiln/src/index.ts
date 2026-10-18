@@ -45,3 +45,6 @@ export { AssetsPlugin, assetsPlugin, Assets, AssetStore, Model } from './plugins
 export type { AssetHandle, AssetKind, AssetOptions, GLTF } from './plugins/assets/index.ts'
 export { DebugPlugin, debugPlugin } from './plugins/debug/index.ts'
 export type { DebugOptions } from './plugins/debug/index.ts'
+export { TimerPlugin, Timer, Lifetime, TimerFinished, Delayed, DelayedEvents, restartTimer, stepsFor, TickTimers } from './plugins/timer/index.ts'
+export { TweenPlugin, Tweens, TweenManager, TweenDone, TickTweens, ease } from './plugins/tween/index.ts'
+export type { TweenOptions, TweenHandle, EaseName, Easing } from './plugins/tween/index.ts'
