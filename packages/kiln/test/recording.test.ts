@@ -307,6 +307,12 @@ describe('recordings', () => {
     expect(live.res(Aim).lost).toBe(1)
     expect(rec.input).toContainEqual(expect.objectContaining({ pointer: expect.objectContaining({ locked: true }) }))
     expect(rec.input.some((e) => 'pointer' in e && e.pointer.dx !== undefined)).toBe(true)
+    // Only changed fields are written: locked movement carries just dx/dy, not the frozen position.
+    const pointers = rec.input.flatMap((e) => ('pointer' in e ? [{ frame: e.frame, ...e.pointer }] : []))
+    const locked = pointers.filter((p) => p.frame > 5 && p.frame < 60)
+    expect(locked.length).toBeGreaterThan(20)
+    for (const p of locked) expect(Object.keys(p).sort()).toEqual(['dx', 'dy', 'frame'])
+    expect(pointers.find((p) => p.frame === 70)).toEqual({ frame: 70, x: 233 })
     const { app, result } = await replayApp(rec, { app: make }, root)
     apps.push(app)
     expect(result.divergedAt).toBeNull()

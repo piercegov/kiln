@@ -263,7 +263,13 @@ class Controller implements InputController {
     const moved = p.dx !== p.x - lp.x || p.dy !== p.y - lp.y
     const posChanged = p.x !== lp.x || p.y !== lp.y || p.ndcX !== lp.ndcX || p.ndcY !== lp.ndcY
     if (posChanged || moved || p.wheel !== 0 || mouse !== lp.mouse || p.locked !== lp.locked) {
-      const pointer: Extract<ScriptEvent, { pointer: unknown }>['pointer'] = { x: p.x, y: p.y, ndcX: p.ndcX, ndcY: p.ndcY }
+      // Only the fields that changed; replay keeps the rest. (Under pointer lock the position is
+      // frozen, so mouse look records just dx/dy.)
+      const pointer: Extract<ScriptEvent, { pointer: unknown }>['pointer'] = {}
+      if (p.x !== lp.x) pointer.x = p.x
+      if (p.y !== lp.y) pointer.y = p.y
+      if (p.ndcX !== lp.ndcX) pointer.ndcX = p.ndcX
+      if (p.ndcY !== lp.ndcY) pointer.ndcY = p.ndcY
       if (moved) {
         pointer.dx = p.dx
         pointer.dy = p.dy
