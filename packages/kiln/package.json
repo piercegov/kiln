@@ -1,6 +1,6 @@
 {
   "name": "kiln-ecs",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A thin, agent-first ECS game runtime on Three.js and Koota.",
   "license": "MIT",
   "keywords": [
