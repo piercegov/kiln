@@ -361,18 +361,36 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     p.ndcY = -((y / rect.height) * 2 - 1)
   }
   const onMove = (e: PointerEvent) => {
-    // Under pointer lock the cursor position freezes; movementX/Y carry the motion.
+    // Under pointer lock the cursor position freezes; movementX/Y carry the motion. A pointermove
+    // with `button` set is a button change while another is held (see onChord), not motion, and
+    // Chrome gives it a bogus movement under lock, so it is skipped.
     if (raw.pointer.locked) {
+      if (e.button >= 0) return
       raw.pointer.dx += e.movementX
       raw.pointer.dy += e.movementY
     } else pos(e)
   }
   const onDown = (e: PointerEvent) => {
-    pos(e)
+    // Under lock the position is frozen, so a click moves nothing.
+    if (!raw.pointer.locked) pos(e)
     raw.keys.add(`Mouse${e.button}`)
     raw.tapped.add(`Mouse${e.button}`)
   }
   const onUp = (e: PointerEvent) => raw.keys.delete(`Mouse${e.button}`)
+  // Pointer Events send only the first button press as pointerdown and the last release as
+  // pointerup. Pressing or releasing another button while one is held arrives as a pointermove
+  // with `button` set (-1 for plain moves); `buttons` says whether that button is now down.
+  // Presses count only over the target, like pointerdown; releases count anywhere.
+  const onChord = (e: PointerEvent) => {
+    if (e.button < 0) return
+    const key = `Mouse${e.button}`
+    const bit = e.button === 1 ? 4 : e.button === 2 ? 2 : 1 << e.button
+    if (!(e.buttons & bit)) raw.keys.delete(key)
+    else if (target === window || (target as HTMLElement).contains(e.target as Node)) {
+      raw.keys.add(key)
+      raw.tapped.add(key)
+    }
+  }
   const onWheel = (e: WheelEvent) => {
     raw.pointer.wheel += e.deltaY
   }
@@ -410,6 +428,7 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
   target.addEventListener('pointermove', onMove as EventListener)
   target.addEventListener('pointerdown', onDown as EventListener)
   window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointermove', onChord)
   target.addEventListener('wheel', onWheel as EventListener, { passive: true })
   canvas?.addEventListener('contextmenu', onContext)
   window.addEventListener('gamepadconnected', onPadOn)
@@ -428,6 +447,7 @@ function attachDom(app: App, raw: RawInput, canvas: HTMLCanvasElement | undefine
     target.removeEventListener('pointermove', onMove as EventListener)
     target.removeEventListener('pointerdown', onDown as EventListener)
     window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointermove', onChord)
     target.removeEventListener('wheel', onWheel as EventListener)
     canvas?.removeEventListener('contextmenu', onContext)
     window.removeEventListener('gamepadconnected', onPadOn)
