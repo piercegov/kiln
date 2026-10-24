@@ -52,6 +52,8 @@ class DebugUI {
   private gFrame = 0
   private gTime = performance.now()
   private entityFolder: any
+  private resFolder: any
+  private resShown = 0
   private onKey: (e: KeyboardEvent) => void
   private lastFrame = 0
   private lastTime = performance.now()
@@ -120,8 +122,10 @@ class DebugUI {
     this.entityFolder = ent.addFolder({ title: 'traits' })
     this.buildEntity()
 
-    const res = pane.addFolder({ title: 'Resources', expanded: false })
-    res.addBinding(this.resources, 'json', { readonly: true, multiline: true, rows: 10 })
+    // Plain resources get editable fields (toggle a debug flag, tune a value), above the JSON of everything.
+    this.resFolder = pane.addFolder({ title: 'Resources', expanded: false })
+    this.resFolder.addBinding(this.resources, 'json', { readonly: true, multiline: true, rows: 10 })
+    this.buildResources()
 
     this.onKey = (e: KeyboardEvent) => {
       if (e.code === 'Backquote') host.style.display = host.style.display === 'none' ? '' : 'none'
@@ -143,6 +147,22 @@ class DebugUI {
   }
 
   private shownEntity: Entity | undefined
+
+  /** Adds a folder per new plain-object resource, binding its number, boolean and string fields to the live value. */
+  private buildResources(): void {
+    const list = this.app.resourceList()
+    for (; this.resShown < list.length; this.resShown++) {
+      const r = list[this.resShown]!
+      if (r.opaque || r.name === 'Time') continue
+      const v = this.app.resource(r) as Record<string, unknown>
+      const proto = Object.getPrototypeOf(v)
+      if (proto !== Object.prototype && proto !== null) continue
+      const keys = Object.keys(v).filter((k) => ['number', 'boolean', 'string'].includes(typeof v[k]))
+      if (keys.length === 0) continue
+      const folder = this.resFolder.addFolder({ title: r.name, expanded: false, index: this.resFolder.children.length - 1 })
+      for (const k of keys) folder.addBinding(v, k)
+    }
+  }
 
   private buildEntity(): void {
     for (const c of [...this.entityFolder.children]) this.entityFolder.remove(c)
@@ -190,6 +210,7 @@ class DebugUI {
     this.stats.entities = app.world.query().length
     this.stats.backend = app.hasResource(Renderer) ? (app.resource(Renderer).backend ?? '-') : '-'
     for (const p of PHASES) for (const cs of app.systemsIn(p)) this.systems[`${p.name}/${cs.name}`] = cs.timing.avg
+    this.buildResources()
     try {
       this.resources.json = JSON.stringify(app.snapshot({ traits: [], resources: true, precision: 3 }).resources, null, 1)
     } catch {}
