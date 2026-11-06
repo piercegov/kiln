@@ -9,6 +9,8 @@
  * - `/__kiln/shot` serves the page `kiln shot` screenshots: the game's index.html (its styles and
  *   markup) with its module scripts swapped for the shot runner.
  * - `POST /__kiln/recording?name=x` writes a session recording (F8 in the game) to recordings/x.json.
+ * - Keeps kiln-ecs out of Vite's dependency pre-bundling, so the names transform reaches Kiln's own
+ *   traits and systems too.
  * - Dedupes three and koota, so a game that installs kiln from outside its own node_modules (a
  *   file: or linked checkout) still shares one copy with it. Two copies of three break WebGPU
  *   lights ("Light node not found"); two copies of koota split traits between worlds.
@@ -76,7 +78,9 @@ export function kiln(options: KilnViteOptions = {}): Plugin {
     name: 'kiln',
     enforce: 'pre',
     config() {
-      return { resolve: { dedupe: ['three', 'koota'] } }
+      // kiln-ecs isn't pre-bundled: pre-bundling skips plugins' transforms, so Kiln's own traits
+      // (Transform, MeshRef, ...) would miss the names transform and show as Trait#N.
+      return { resolve: { dedupe: ['three', 'koota'] }, optimizeDeps: { exclude: ['kiln-ecs'] } }
     },
     configResolved(c) {
       root = c.root

@@ -4,6 +4,7 @@ import { traitName } from '../../core/names.ts'
 import { plugin, type Plugin } from '../../core/plugin.ts'
 import { PHASES } from '../../core/schedule.ts'
 import { Renderer } from '../render/index.ts'
+import { fieldShape, fieldTree, isPlain, type FieldTree } from './fields.ts'
 
 export interface DebugOptions {
   /** Start with the panel open. Default true. Toggle with the ` key. */
@@ -16,7 +17,8 @@ const ENTITY_ID_MASK = (1 << 20) - 1
 
 /**
  * Tweakpane inspector for dev builds: FPS, frame and tick, per-system timings, an entity
- * inspector with editable fields, resource values, pause/step and snapshot-to-console.
+ * inspector with editable fields (an object trait's plain fields too, nested; see fields.ts),
+ * resource values, pause/step and snapshot-to-console.
  * Toggle with the ` key; `?debug=0` hides it. Does nothing headless or in production.
  */
 export function debugPlugin(options: DebugOptions = {}): Plugin {
@@ -54,6 +56,10 @@ class DebugUI {
   private entityFolder: any
   private resFolder: any
   private resShown = 0
+  /** Whether each object-trait folder is open, by path (`Trait/key/...`), kept across rebuilds. */
+  private expanded = new Map<string, boolean>()
+  /** Set when an object trait's layout changed (a map gained an entry, say), so the entity is rebuilt. */
+  private stale = false
   private onKey: (e: KeyboardEvent) => void
   private lastFrame = 0
   private lastTime = performance.now()
@@ -177,6 +183,24 @@ class DebugUI {
     for (const t of traits ?? []) {
       const name = traitName(t)
       const type = (t[$internal] as any).type
+      if (type === 'aos') {
+        // An object trait's plain fields are bound to the live object, so edits apply at once and
+        // pane.refresh() shows the game's changes. Class instances (meshes, bodies) aren't opened up.
+        // A plain object with nothing to edit yet (an empty map) still gets its folder, so it fills
+        // in when the game adds to it.
+        const value = e.get(t)
+        const tree = fieldTree(value) ?? (isPlain(value) ? { leaves: [], children: [], more: 0 } : null)
+        if (tree) {
+          const shape = fieldShape(tree)
+          const folder = this.addFields(this.entityFolder, name, value as Record<string, unknown>, tree, name)
+          ;(folder as any).__sync = () => {
+            if (!this.app.world.has(e)) return
+            const now = e.get(t)
+            if (now !== value || fieldShape(fieldTree(now)) !== shape) this.stale = true
+          }
+          continue
+        }
+      }
       if (type !== 'soa') {
         this.entityFolder.addBlade({ view: 'text', label: name, parse: (v: string) => v, value: type === 'tag' ? 'tag' : 'object' })
         continue
@@ -195,6 +219,17 @@ class DebugUI {
         folder.refresh()
       }
     }
+  }
+
+  /** A folder for `obj` under `parent`: a binding for each of `tree`'s fields, a folder for each plain object under it, opened as it was last left (closed at first). */
+  private addFields(parent: any, title: string, obj: Record<string, unknown>, tree: FieldTree, path: string): any {
+    const folder = parent.addFolder({ title, expanded: this.expanded.get(path) ?? false })
+    folder.on('fold', (ev: { expanded: boolean }) => this.expanded.set(path, ev.expanded))
+    for (const k of tree.leaves) folder.addBinding(obj, k)
+    for (const [k, child] of tree.children) this.addFields(folder, k, obj[k] as Record<string, unknown>, child, `${path}/${k}`)
+    if (tree.more) folder.addBlade({ view: 'text', label: '…', parse: (v: string) => v, value: `${tree.more} more` })
+    if (!tree.leaves.length && !tree.children.length && !tree.more) folder.addBlade({ view: 'text', label: '', parse: (v: string) => v, value: 'empty' })
+    return folder
   }
 
   private refresh(): void {
@@ -217,7 +252,11 @@ class DebugUI {
     // Entities come and go (startup, despawns): rebuild when the shown one changed.
     const e = this.entityById(this.inspect.id)
     if (e !== this.shownEntity) this.buildEntity()
-    else for (const c of this.entityFolder.children) (c as any).__sync?.()
+    else {
+      for (const c of this.entityFolder.children) (c as any).__sync?.()
+      if (this.stale) this.buildEntity()
+    }
+    this.stale = false
     this.pane.refresh()
   }
 

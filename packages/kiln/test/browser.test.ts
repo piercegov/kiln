@@ -55,6 +55,11 @@ describe('vite plugin', () => {
     const config = await resolveConfig({ configFile: false, logLevel: 'silent', plugins: [kiln()] }, 'serve')
     expect(config.resolve.dedupe).toEqual(expect.arrayContaining(['three', 'koota']))
   })
+
+  test('keeps kiln-ecs out of pre-bundling, so the names transform reaches its own traits', async () => {
+    const config = await resolveConfig({ configFile: false, logLevel: 'silent', plugins: [kiln()] }, 'serve')
+    expect(config.optimizeDeps.exclude).toContain('kiln-ecs')
+  })
 })
 
 describe('kiln shot', () => {
