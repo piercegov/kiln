@@ -4,7 +4,7 @@ import { traitName } from '../../core/names.ts'
 import { plugin, type Plugin } from '../../core/plugin.ts'
 import { PHASES } from '../../core/schedule.ts'
 import { Renderer } from '../render/index.ts'
-import { fieldShape, fieldTree, isPlain, type FieldTree } from './fields.ts'
+import { fieldShape, traitFields, type FieldTree } from './fields.ts'
 
 export interface DebugOptions {
   /** Start with the panel open. Default true. Toggle with the ` key. */
@@ -56,7 +56,7 @@ class DebugUI {
   private entityFolder: any
   private resFolder: any
   private resShown = 0
-  /** Whether each object-trait folder is open, by path (`Trait/key/...`), kept across rebuilds. */
+  /** Whether each trait's folder is open, by path (`Trait`, or `Trait/key/...` inside an object trait), kept across rebuilds. */
   private expanded = new Map<string, boolean>()
   /** Set when an object trait's layout changed (a map gained an entry, say), so the entity is rebuilt. */
   private stale = false
@@ -186,17 +186,15 @@ class DebugUI {
       if (type === 'aos') {
         // An object trait's plain fields are bound to the live object, so edits apply at once and
         // pane.refresh() shows the game's changes. Class instances (meshes, bodies) aren't opened up.
-        // A plain object with nothing to edit yet (an empty map) still gets its folder, so it fills
-        // in when the game adds to it.
         const value = e.get(t)
-        const tree = fieldTree(value) ?? (isPlain(value) ? { leaves: [], children: [], more: 0 } : null)
+        const tree = traitFields(value)
         if (tree) {
           const shape = fieldShape(tree)
           const folder = this.addFields(this.entityFolder, name, value as Record<string, unknown>, tree, name)
           ;(folder as any).__sync = () => {
             if (!this.app.world.has(e)) return
             const now = e.get(t)
-            if (now !== value || fieldShape(fieldTree(now)) !== shape) this.stale = true
+            if (now !== value || fieldShape(traitFields(now)) !== shape) this.stale = true
           }
           continue
         }
@@ -206,7 +204,8 @@ class DebugUI {
         continue
       }
       const rec = { ...(e.get(t) as Record<string, unknown>) }
-      const folder = this.entityFolder.addFolder({ title: name })
+      const folder = this.entityFolder.addFolder({ title: name, expanded: this.expanded.get(name) ?? true })
+      folder.on('fold', (ev: { expanded: boolean }) => this.expanded.set(name, ev.expanded))
       for (const [k, v] of Object.entries(rec)) {
         if (typeof v !== 'number' && typeof v !== 'boolean' && typeof v !== 'string') continue
         folder.addBinding(rec, k).on('change', (ev: { value: unknown }) => {

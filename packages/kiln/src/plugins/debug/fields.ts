@@ -46,6 +46,11 @@ export function fieldTree(v: unknown, depth = 0): FieldTree | null {
   return tree.leaves.length || tree.children.length || tree.more ? tree : null
 }
 
+/** The fields the panel shows for an object trait's value: as fieldTree, but a plain object with nothing to edit yet (an empty map) is an empty tree rather than null, so it gets a folder that fills in as the game adds to it. Null when it isn't plain. */
+export function traitFields(v: unknown): FieldTree | null {
+  return fieldTree(v) ?? (isPlain(v) ? { leaves: [], children: [], more: 0 } : null)
+}
+
 /** A key for a tree's layout (which fields and folders, not their values): the panel rebuilds an entity's fields when it changes, as when a map gains an entry. */
 export function fieldShape(tree: FieldTree | null): string {
   if (!tree) return ''

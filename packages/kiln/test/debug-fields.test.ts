@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { FIELD_DEPTH, FIELD_LIMIT, fieldShape, fieldTree, isPlain } from '../src/plugins/debug/fields.ts'
+import { FIELD_DEPTH, FIELD_LIMIT, fieldShape, fieldTree, isPlain, traitFields } from '../src/plugins/debug/fields.ts'
 
 describe('debug panel: object trait fields', () => {
   test('opens nested plain objects, listing their number, boolean and string fields', () => {
@@ -43,5 +43,14 @@ describe('debug panel: object trait fields', () => {
     const a = fieldShape(fieldTree({ fists: { level: 1 } }))
     expect(fieldShape(fieldTree({ fists: { level: 9 } }))).toBe(a)
     expect(fieldShape(fieldTree({ fists: { level: 1 }, sword: { level: 0 } }))).not.toBe(a)
+  })
+
+  test("an empty map gets an empty folder, whose shape holds steady until it gains an entry", () => {
+    expect(fieldTree({})).toBeNull()
+    expect(traitFields({})).toEqual({ leaves: [], children: [], more: 0 })
+    expect(traitFields(new Map())).toBeNull()
+    // The panel compares the shape it built with against a fresh one each refresh: they must agree.
+    expect(fieldShape(traitFields({}))).toBe(fieldShape(traitFields({})))
+    expect(fieldShape(traitFields({ fists: { level: 0 } }))).not.toBe(fieldShape(traitFields({})))
   })
 })
