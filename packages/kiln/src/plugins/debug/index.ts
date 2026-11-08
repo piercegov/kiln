@@ -58,8 +58,6 @@ class DebugUI {
   private resShown = 0
   /** Whether each trait's folder is open, by path (`Trait`, or `Trait/key/...` inside an object trait), kept across rebuilds. */
   private expanded = new Map<string, boolean>()
-  /** Set when an object trait's layout changed (a map gained an entry, say), so the entity is rebuilt. */
-  private stale = false
   private onKey: (e: KeyboardEvent) => void
   private lastFrame = 0
   private lastTime = performance.now()
@@ -180,49 +178,57 @@ class DebugUI {
     }
     this.entityFolder.title = `entity ${this.inspect.id}`
     const traits = this.app.world[$internal].entityTraits.get(e) as Set<Trait> | undefined
-    for (const t of traits ?? []) {
-      const name = traitName(t)
-      const type = (t[$internal] as any).type
-      if (type === 'aos') {
-        // An object trait's plain fields are bound to the live object, so edits apply at once and
-        // pane.refresh() shows the game's changes. Class instances (meshes, bodies) aren't opened up.
-        const value = e.get(t)
-        const tree = traitFields(value)
-        if (tree) {
-          const shape = fieldShape(tree)
-          const folder = this.addFields(this.entityFolder, name, value as Record<string, unknown>, tree, name)
-          ;(folder as any).__sync = () => {
-            if (!this.app.world.has(e)) return
-            const now = e.get(t)
-            if (now !== value || fieldShape(traitFields(now)) !== shape) this.stale = true
-          }
-          continue
+    for (const t of traits ?? []) this.addTrait(e, t)
+  }
+
+  /** The blade or folder for trait `t` of `e`, at `index` among the entity's (the end by default). */
+  private addTrait(e: Entity, t: Trait, index?: number): void {
+    const name = traitName(t)
+    const type = (t[$internal] as any).type
+    if (type === 'aos') {
+      // An object trait's plain fields are bound to the live object, so edits apply at once and
+      // pane.refresh() shows the game's changes. Class instances (meshes, bodies) aren't opened up.
+      const value = e.get(t)
+      const tree = traitFields(value)
+      if (tree) {
+        const shape = fieldShape(tree)
+        const folder = this.addFields(this.entityFolder, name, value as Record<string, unknown>, tree, name, index)
+        ;(folder as any).__sync = () => {
+          if (!this.app.world.has(e)) return
+          const now = e.get(t)
+          if (now === value && fieldShape(traitFields(now)) === shape) return
+          // Its layout changed (a map gained an entry, a field went from null to a value): rebuild
+          // only this trait's folder, in place. Rebuilding the whole entity costs a frame on a big one.
+          const at = this.entityFolder.children.indexOf(folder)
+          this.entityFolder.remove(folder)
+          this.addTrait(e, t, at)
         }
+        return
       }
-      if (type !== 'soa') {
-        this.entityFolder.addBlade({ view: 'text', label: name, parse: (v: string) => v, value: type === 'tag' ? 'tag' : 'object' })
-        continue
-      }
-      const rec = { ...(e.get(t) as Record<string, unknown>) }
-      const folder = this.entityFolder.addFolder({ title: name, expanded: this.expanded.get(name) ?? true })
-      folder.on('fold', (ev: { expanded: boolean }) => this.expanded.set(name, ev.expanded))
-      for (const [k, v] of Object.entries(rec)) {
-        if (typeof v !== 'number' && typeof v !== 'boolean' && typeof v !== 'string') continue
-        folder.addBinding(rec, k).on('change', (ev: { value: unknown }) => {
-          if (this.app.world.has(e)) e.set(t, { [k]: ev.value } as never)
-        })
-      }
-      ;(folder as any).__sync = () => {
-        if (!this.app.world.has(e)) return
-        Object.assign(rec, e.get(t))
-        folder.refresh()
-      }
+    }
+    if (type !== 'soa') {
+      this.entityFolder.addBlade({ view: 'text', label: name, parse: (v: string) => v, value: type === 'tag' ? 'tag' : 'object', index })
+      return
+    }
+    const rec = { ...(e.get(t) as Record<string, unknown>) }
+    const folder = this.entityFolder.addFolder({ title: name, expanded: this.expanded.get(name) ?? true, index })
+    folder.on('fold', (ev: { expanded: boolean }) => this.expanded.set(name, ev.expanded))
+    for (const [k, v] of Object.entries(rec)) {
+      if (typeof v !== 'number' && typeof v !== 'boolean' && typeof v !== 'string') continue
+      folder.addBinding(rec, k).on('change', (ev: { value: unknown }) => {
+        if (this.app.world.has(e)) e.set(t, { [k]: ev.value } as never)
+      })
+    }
+    ;(folder as any).__sync = () => {
+      if (!this.app.world.has(e)) return
+      Object.assign(rec, e.get(t))
+      folder.refresh()
     }
   }
 
-  /** A folder for `obj` under `parent`: a binding for each of `tree`'s fields, a folder for each plain object under it, opened as it was last left (closed at first). */
-  private addFields(parent: any, title: string, obj: Record<string, unknown>, tree: FieldTree, path: string): any {
-    const folder = parent.addFolder({ title, expanded: this.expanded.get(path) ?? false })
+  /** A folder for `obj` under `parent` (at `index` among its children, the end by default): a binding for each of `tree`'s fields, a folder for each plain object under it, opened as it was last left (closed at first). */
+  private addFields(parent: any, title: string, obj: Record<string, unknown>, tree: FieldTree, path: string, index?: number): any {
+    const folder = parent.addFolder({ title, expanded: this.expanded.get(path) ?? false, index })
     folder.on('fold', (ev: { expanded: boolean }) => this.expanded.set(path, ev.expanded))
     for (const k of tree.leaves) folder.addBinding(obj, k)
     for (const [k, child] of tree.children) this.addFields(folder, k, obj[k] as Record<string, unknown>, child, `${path}/${k}`)
@@ -251,11 +257,7 @@ class DebugUI {
     // Entities come and go (startup, despawns): rebuild when the shown one changed.
     const e = this.entityById(this.inspect.id)
     if (e !== this.shownEntity) this.buildEntity()
-    else {
-      for (const c of this.entityFolder.children) (c as any).__sync?.()
-      if (this.stale) this.buildEntity()
-    }
-    this.stale = false
+    else for (const c of [...this.entityFolder.children]) (c as any).__sync?.()
     this.pane.refresh()
   }
 
